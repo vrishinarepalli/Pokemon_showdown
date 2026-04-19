@@ -33,12 +33,29 @@ class SmogonDataFetcher:
     def get_latest_month(self) -> str:
         """
         Get the latest month available on Smogon stats
+        Automatically finds the most recent available data
 
         Returns:
             Month string in format YYYY-MM
         """
-        # For now, we'll use the current year-month
-        # In production, this should check the Smogon stats page
+        # Try to fetch the stats page to find latest month
+        try:
+            response = requests.get(self.BASE_URL, timeout=10)
+            response.raise_for_status()
+
+            # Parse HTML to find latest month directories
+            # Format: YYYY-MM/
+            import re
+            months = re.findall(r'(\d{4}-\d{2})/', response.text)
+            if months:
+                # Get the most recent month
+                latest = sorted(months)[-1]
+                print(f"  Found latest month: {latest}")
+                return latest
+        except Exception as e:
+            print(f"  Could not auto-detect latest month: {e}")
+
+        # Fallback: Use current year-month minus 1
         now = datetime.now()
         # Smogon stats are usually 1 month behind
         month = now.month - 1
@@ -46,7 +63,10 @@ class SmogonDataFetcher:
         if month == 0:
             month = 12
             year -= 1
-        return f"{year}-{month:02d}"
+
+        latest = f"{year}-{month:02d}"
+        print(f"  Using fallback month: {latest}")
+        return latest
 
     def fetch_usage_stats(self, month: Optional[str] = None) -> Dict:
         """

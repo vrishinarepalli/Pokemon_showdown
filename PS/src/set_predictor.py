@@ -92,6 +92,21 @@ class SetPredictor:
         prediction.spread_probs = self._normalize_probs(moveset_data.get('spreads', {}))
         prediction.tera_probs = self._normalize_probs(moveset_data.get('tera_types', {}))
 
+        # AUTO-CONFIRM single-ability Pokemon
+        if len(prediction.ability_probs) == 1:
+            ability_name = list(prediction.ability_probs.keys())[0]
+            prediction.revealed_ability = ability_name
+            prediction.ability_probs = {ability_name: 1.0}
+            print(f"  ✓ Single ability: {ability_name} (auto-confirmed)")
+
+        # AUTO-CONFIRM required items (forme changes)
+        # Check if this Pokemon requires a specific item (e.g., Ogerpon masks)
+        required_item = self._get_required_item(pokemon_name)
+        if required_item:
+            prediction.revealed_item = required_item
+            prediction.item_probs = {required_item: 1.0}
+            print(f"  ✓ Required item: {required_item} (forme-specific)")
+
         # Calculate initial confidence (how concentrated is the distribution)
         prediction.confidence = self._calculate_confidence(prediction)
 
@@ -606,6 +621,37 @@ class SetPredictor:
 
         # This is a simplified example
         return prediction
+
+    def _get_required_item(self, pokemon_name: str) -> Optional[str]:
+        """
+        Get required item for forme-specific Pokemon
+
+        Args:
+            pokemon_name: Pokemon species name
+
+        Returns:
+            Required item name, or None if no specific item required
+        """
+        # Forme-specific required items
+        required_items = {
+            # Ogerpon formes
+            'Ogerpon-Wellspring': 'Wellspring Mask',
+            'Ogerpon-Hearthflame': 'Hearthflame Mask',
+            'Ogerpon-Cornerstone': 'Cornerstone Mask',
+
+            # Arceus plates (if ever added to OU)
+            'Arceus-Fire': 'Flame Plate',
+            'Arceus-Water': 'Splash Plate',
+            'Arceus-Electric': 'Zap Plate',
+            # ... etc
+
+            # Silvally memories (if relevant)
+            'Silvally-Fire': 'Fire Memory',
+            'Silvally-Water': 'Water Memory',
+            # ... etc
+        }
+
+        return required_items.get(pokemon_name)
 
 
 def main():
