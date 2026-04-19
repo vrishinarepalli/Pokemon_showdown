@@ -76,6 +76,29 @@ for this module. The formulation shifts from `P(move | pokemon)` to
 collapse the belief immediately, which the per-move formulation
 misses.
 
+Three additional existing modules plug into this component rather
+than being rewritten:
+
+- `src/hybrid_predictor.py` wraps `set_predictor.py` with adaptive
+  blending between the Bayesian baseline and a learned ML component.
+  For v1 we run with ML weight at zero (pure Bayesian); the hybrid
+  structure is kept so the ML path can be enabled in v2 without
+  restructuring.
+- `src/niche_mechanics.py` is a constraint refiner for Gen 9 edge
+  cases — Heavy-Duty Boots vs. hazards, Paradox ability gates,
+  Booster Energy, forme-locked items, Knock Off interactions. It is
+  invoked after each Bayesian update to drop sets that are
+  inconsistent with observed behaviour beyond simple move/ability
+  matches.
+- `src/battle_recorder.py` serialises finalised sets and revealed
+  timing into a structured JSON log. It is the training-data feed
+  for the value network (M5) and is called from the self-play loop,
+  not from the belief update itself.
+
+These modules were authored previously but were never wired
+together. The M2 deliverable is that integration — not new
+probabilistic code.
+
 ### 3. Simulator
 
 Rolls out hypothetical turns for the planner. We do not write one.
@@ -99,6 +122,13 @@ Outputs `P(opponent_action | state)` for the planner's expectation.
   HP). This matches roughly 80% of competent ladder players'
   behavior in randbats.
 - v2: learned policy prior, trained from self-play trajectories.
+
+`src/next_move_predictor.py` provides the scaffolding for this
+component — a move-scoring framework with threat, defensive,
+momentum, and game-theory axes. The framework is retained; the
+scoring functions inside it are stubs and will be replaced with the
+v1 heuristic. `src/damage_calculator.py` supplies the Gen 9 damage
+formula used by the threat term.
 
 ### 5. Planner
 
@@ -153,8 +183,8 @@ compare against.
 
 | M  | Deliverable                                              | Acceptance                                              |
 | -- | -------------------------------------------------------- | ------------------------------------------------------- |
-| M1 | Local server + poke-env harness + throwaway alt          | Two poke-env scripted agents complete a battle locally  |
-| M2 | Belief state module                                      | Posterior collapses to correct set within 3 revealed moves on recorded games |
+| M1 | Local server + poke-env harness + throwaway alt          | Two poke-env scripted agents complete a battle locally (complete) |
+| M2 | Belief state module — integrate hybrid_predictor, niche_mechanics, battle_recorder behind a single interface | Posterior collapses to correct set within 3 revealed moves on recorded games |
 | M3 | Heuristic agent                                          | ≥95% winrate vs random agent over 500 games             |
 | M4 | Expectimax planner + hand-crafted value function         | ≥60% winrate vs M3 over 500 games                       |
 | M5 | Value network, self-play training loop, eval harness     | ≥60% winrate vs M4 over 500 games                       |
