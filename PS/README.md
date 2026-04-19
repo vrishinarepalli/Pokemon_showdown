@@ -106,10 +106,43 @@ python convert_data_to_js.py
 Load `extension/` as an unpacked extension from
 `chrome://extensions/`.
 
-### Bot (when implemented)
+### Bot
 
-Will require a local `pokemon-showdown` server and `poke-env`. Setup
-instructions will be added with the M1 milestone.
+The bot connects to a local `pokemon-showdown` server over WebSocket.
+It does not automate the public ladder.
+
+Install the server (one-time):
+
+```bash
+git clone https://github.com/smogon/pokemon-showdown ~/pokemon-showdown
+cd ~/pokemon-showdown
+npm install
+```
+
+Install Python dependencies (already included in `requirements.txt`):
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the M1 smoke test. In one shell, start the server:
+
+```bash
+cd ~/pokemon-showdown
+node pokemon-showdown start --no-security
+```
+
+`--no-security` disables authentication so any username connects
+without a password. In a second shell, from this repository's `PS/`
+directory:
+
+```bash
+python -m bot.client.smoke_test
+```
+
+A single `gen9randombattle` runs between two random agents; the
+script prints the result. This confirms the harness is functional
+and is the acceptance test for M1.
 
 ## Documentation
 
