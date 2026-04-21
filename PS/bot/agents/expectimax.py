@@ -23,6 +23,11 @@ from bot.value.handcrafted import HandcraftedValue
 _NORM = 350.0  # move power score → HP fraction; 350 ≈ realistic damage range
 _MIN_OPP_POWER = 40.0
 
+# Stealth Rock damage = 1/8 * rock-type effectiveness against switch-in.
+_SR_BASE = 0.125
+# Spikes damage by layer count (grounded targets only).
+_SPIKES_DAMAGE = {1: 1 / 8, 2: 1 / 6, 3: 1 / 4}
+
 
 class ExpectimaxAgent(Player):
     def __init__(self, *args, **kwargs):
@@ -77,7 +82,8 @@ class ExpectimaxAgent(Player):
     def _eval_switch(self, pokemon, battle, type_chart) -> float:
         opp = battle.opponent_active_pokemon
         opp_power = _opp_power_vs(opp, pokemon, type_chart)
-        our_after = max(0.0, pokemon.current_hp_fraction - opp_power / _NORM)
+        hazard = _hazard_damage(pokemon, battle.side_conditions, type_chart)
+        our_after = max(0.0, pokemon.current_hp_fraction - hazard - opp_power / _NORM)
         opp_after = opp.current_hp_fraction if opp else 1.0
         return self._value.score_transition(battle, our_after, opp_after)
 
@@ -138,14 +144,84 @@ def _we_go_first(move, attacker, defender) -> bool:
 def _effective_speed(pokemon, use_actual: bool) -> float:
     if pokemon is None:
         return 100.0
-    if use_actual and pokemon.stats:
-        base = pokemon.stats.get("spe") or pokemon.base_stats.get("spe") or 100
+    if use_actual and pokemon.stats and pokemon.stats.get("spe"):
+        base = pokemon.stats["spe"]
     else:
-        base = (pokemon.base_stats or {}).get("spe") or 100
+        base_spe = (pokemon.base_stats or {}).get("spe") or 100
+        level = getattr(pokemon, "level", None) or 80
+        base = _estimate_actual_speed(base_spe, level)
     stage = (pokemon.boosts or {}).get("spe", 0)
     if stage >= 0:
         return base * (2 + stage) / 2.0
     return base * 2.0 / (2 - stage)
+
+
+def _estimate_actual_speed(base_stat: int, level: int) -> float:
+    """Rough max-EV/IV actual stat approximation.
+
+    Level 80, 31 IV, 252 EV, neutral nature: ((2*base + 31 + 63) * 80) / 100 + 5.
+    Good enough for speed comparisons in random battles where we don't know
+    the opponent's exact EV spread.
+    """
+    return ((2 * base_stat + 94) * level) / 100.0 + 5.0
+
+
+def _hazard_damage(pokemon, side_conditions, type_chart) -> float:
+    """HP fraction lost switching into hazards on our side."""
+    if not side_conditions:
+        return 0.0
+
+    sr_key = _match_condition(side_conditions, "stealthrock")
+    spikes_key = _match_condition(side_conditions, "spikes")
+
+    damage = 0.0
+
+    if sr_key is not None:
+        rock = _rock_type(type_chart)
+        if rock is not None:
+            eff = rock.damage_multiplier(
+                pokemon.type_1, pokemon.type_2, type_chart=type_chart
+            )
+            damage += _SR_BASE * eff
+
+    if spikes_key is not None and _grounded(pokemon):
+        layers = side_conditions[spikes_key] or 1
+        damage += _SPIKES_DAMAGE.get(layers, _SPIKES_DAMAGE[3])
+
+    return damage
+
+
+def _match_condition(side_conditions, name: str):
+    for key in side_conditions:
+        label = getattr(key, "name", str(key)).lower().replace("_", "")
+        if label == name:
+            return key
+    return None
+
+
+def _rock_type(type_chart):
+    from poke_env.environment.pokemon_type import PokemonType
+    try:
+        return PokemonType.ROCK
+    except AttributeError:
+        return None
+
+
+def _grounded(pokemon) -> bool:
+    from poke_env.environment.pokemon_type import PokemonType
+    try:
+        flying = PokemonType.FLYING
+    except AttributeError:
+        flying = None
+    if flying is not None and (pokemon.type_1 == flying or pokemon.type_2 == flying):
+        return False
+    ability = (getattr(pokemon, "ability", None) or "").lower().replace(" ", "")
+    if ability in ("levitate", "magnetrise"):
+        return False
+    item = (getattr(pokemon, "item", None) or "").lower().replace(" ", "")
+    if item == "airballoon":
+        return False
+    return True
 
 
 def _best_forced_switch(battle, type_chart):
