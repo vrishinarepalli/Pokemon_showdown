@@ -185,7 +185,7 @@ compare against.
 | -- | -------------------------------------------------------- | ------------------------------------------------------- |
 | M1 | Local server + poke-env harness + throwaway alt          | Two poke-env scripted agents complete a battle locally (complete) |
 | M2 | Belief state module — integrate hybrid_predictor, niche_mechanics, battle_recorder behind a single interface | Posterior collapses to correct set within 3 revealed moves on recorded games |
-| M3 | Heuristic agent                                          | ≥95% winrate vs random agent over 500 games             |
+| M3 | Heuristic agent                                          | ≥95% winrate vs random agent over 500 games (complete, 98.6%) |
 | M4 | Expectimax planner + hand-crafted value function         | ≥60% winrate vs M3 over 500 games                       |
 | M5 | Value network, self-play training loop, eval harness     | ≥60% winrate vs M4 over 500 games                       |
 | M6 | Policy prior + MCTS                                      | ≥55% winrate vs M5 over 500 games                       |
