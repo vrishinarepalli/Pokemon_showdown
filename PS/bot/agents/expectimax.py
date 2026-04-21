@@ -15,7 +15,6 @@ Acceptance: >=60% winrate vs HeuristicAgent over 500 games.
 """
 
 from poke_env.data import GenData
-from poke_env.environment import PokemonType
 from poke_env.player import Player
 
 from bot.value.handcrafted import HandcraftedValue
@@ -178,10 +177,7 @@ def _hazard_damage(pokemon, side_conditions, type_chart) -> float:
     damage = 0.0
 
     if sr_key is not None:
-        eff = PokemonType.ROCK.damage_multiplier(
-            pokemon.type_1, pokemon.type_2, type_chart=type_chart
-        )
-        damage += _SR_BASE * eff
+        damage += _SR_BASE * _rock_effectiveness(pokemon, type_chart)
 
     if spikes_key is not None and _grounded(pokemon):
         layers = side_conditions[spikes_key] or 1
@@ -198,9 +194,20 @@ def _match_condition(side_conditions, name: str):
     return None
 
 
+def _rock_effectiveness(pokemon, type_chart) -> float:
+    row = type_chart.get("ROCK") or {}
+    mult = 1.0
+    for t in (pokemon.type_1, pokemon.type_2):
+        if t is None:
+            continue
+        mult *= row.get(getattr(t, "name", str(t)).upper(), 1.0)
+    return mult
+
+
 def _grounded(pokemon) -> bool:
-    if pokemon.type_1 == PokemonType.FLYING or pokemon.type_2 == PokemonType.FLYING:
-        return False
+    for t in (pokemon.type_1, pokemon.type_2):
+        if t is not None and getattr(t, "name", str(t)).upper() == "FLYING":
+            return False
     ability = (getattr(pokemon, "ability", None) or "").lower().replace(" ", "")
     if ability in ("levitate", "magnetrise"):
         return False
