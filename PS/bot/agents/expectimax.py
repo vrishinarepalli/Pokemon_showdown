@@ -20,7 +20,7 @@ from poke_env.player import Player
 from bot.value.handcrafted import HandcraftedValue
 
 
-_NORM = 250.0
+_NORM = 350.0  # move power score → HP fraction; 350 ≈ realistic damage range
 _MIN_OPP_POWER = 40.0
 
 

@@ -7,7 +7,7 @@ Terms (weighted sum):
   - Team-wide average HP differential          (0.25)
   - Pokemon count differential                 (0.20)
   - Stat-boost differential on active Pokemon  (0.10)
-  - KO bonus / penalty                         (±0.30 when active HP hits 0)
+  - KO bonus for eliminating opponent           (+0.15 when opp HP hits 0)
 
 The weights are deliberately conservative. The value function exists to
 rank actions, not to produce a calibrated win probability — calibration
@@ -33,14 +33,15 @@ class HandcraftedValue:
         our_hp_after = max(0.0, min(1.0, our_hp_after))
         opp_hp_after = max(0.0, min(1.0, opp_hp_after))
 
-        ko_term = 0.0
-        if our_hp_after <= 0.0:
-            ko_term -= 0.30
-        if opp_hp_after <= 0.0:
-            ko_term += 0.30
+        # Only bonus for KO'ing the opponent — no penalty for getting KO'd.
+        # The HP differential term already captures the cost of dying. Adding
+        # an extra penalty causes depth-1 search to incorrectly avoid trading
+        # a low-HP mon for significant damage dealt, since it can't see the
+        # follow-up turn where a fresh switch-in finishes the job.
+        ko_term = 0.15 if opp_hp_after <= 0.0 else 0.0
 
         total = (
-            0.35 * (our_hp_after - opp_hp_after)
+            0.40 * (our_hp_after - opp_hp_after)
             + 0.25 * _team_hp_diff(battle)
             + 0.20 * _count_diff(battle)
             + 0.10 * _boost_diff(battle)
