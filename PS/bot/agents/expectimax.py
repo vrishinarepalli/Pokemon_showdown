@@ -171,6 +171,12 @@ def _hazard_damage(pokemon, side_conditions, type_chart) -> float:
     if not side_conditions:
         return 0.0
 
+    # Heavy-Duty Boots and Magic Guard ignore every entry hazard.
+    item = _norm(getattr(pokemon, "item", None))
+    ability = _norm(getattr(pokemon, "ability", None))
+    if item == "heavydutyboots" or ability == "magicguard":
+        return 0.0
+
     sr_key = _match_condition(side_conditions, "stealthrock")
     spikes_key = _match_condition(side_conditions, "spikes")
 
@@ -184,6 +190,10 @@ def _hazard_damage(pokemon, side_conditions, type_chart) -> float:
         damage += _SPIKES_DAMAGE.get(layers, _SPIKES_DAMAGE[3])
 
     return damage
+
+
+def _norm(value) -> str:
+    return (value or "").lower().replace(" ", "").replace("-", "")
 
 
 def _match_condition(side_conditions, name: str):
@@ -208,11 +218,9 @@ def _grounded(pokemon) -> bool:
     for t in (pokemon.type_1, pokemon.type_2):
         if t is not None and getattr(t, "name", str(t)).upper() == "FLYING":
             return False
-    ability = (getattr(pokemon, "ability", None) or "").lower().replace(" ", "")
-    if ability in ("levitate", "magnetrise"):
+    if _norm(getattr(pokemon, "ability", None)) in ("levitate", "magnetrise"):
         return False
-    item = (getattr(pokemon, "item", None) or "").lower().replace(" ", "")
-    if item == "airballoon":
+    if _norm(getattr(pokemon, "item", None)) == "airballoon":
         return False
     return True
 
