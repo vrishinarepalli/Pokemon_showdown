@@ -40,6 +40,13 @@ class ExpectimaxAgent(Player):
         if not battle.available_moves and battle.available_switches:
             return self.create_order(_best_forced_switch(battle, type_chart))
 
+        # Forced pseudo-moves (Recharge, Struggle, Outrage lock-in, Choice lock):
+        # if the engine gives us exactly one option and no switches, there's no
+        # decision to make — avoid evaluating the move since its data may be
+        # incomplete (e.g. Recharge has no priority field).
+        if len(battle.available_moves) == 1 and not battle.available_switches:
+            return self.create_order(battle.available_moves[0])
+
         best_order = None
         best_score = float("-inf")
 
