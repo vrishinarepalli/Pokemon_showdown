@@ -14,7 +14,6 @@ switches. This is the floor the rest of the bot must exceed.
 Acceptance: >=95% winrate vs RandomPlayer over 500 games.
 """
 
-from poke_env.environment.move_category import MoveCategory
 from poke_env.player import Player
 
 
@@ -48,12 +47,9 @@ class HeuristicAgent(Player):
         return self.create_order(best_move)
 
     def _score_move(self, move, battle) -> float:
-        if move.category == MoveCategory.STATUS:
-            return STATUS_MOVE_SCORE
-
         base_power = move.base_power or 0
         if base_power <= 0:
-            return 0.0
+            return STATUS_MOVE_SCORE
 
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
@@ -88,8 +84,6 @@ class HeuristicAgent(Player):
 
         offense = 0.0
         for move in pokemon.moves.values():
-            if move.category == MoveCategory.STATUS:
-                continue
             base_power = move.base_power or 0
             if base_power <= 0:
                 continue
