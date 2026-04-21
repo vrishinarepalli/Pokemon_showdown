@@ -15,6 +15,7 @@ Acceptance: >=60% winrate vs HeuristicAgent over 500 games.
 """
 
 from poke_env.data import GenData
+from poke_env.environment import PokemonType
 from poke_env.player import Player
 
 from bot.value.handcrafted import HandcraftedValue
@@ -177,12 +178,10 @@ def _hazard_damage(pokemon, side_conditions, type_chart) -> float:
     damage = 0.0
 
     if sr_key is not None:
-        rock = _rock_type(type_chart)
-        if rock is not None:
-            eff = rock.damage_multiplier(
-                pokemon.type_1, pokemon.type_2, type_chart=type_chart
-            )
-            damage += _SR_BASE * eff
+        eff = PokemonType.ROCK.damage_multiplier(
+            pokemon.type_1, pokemon.type_2, type_chart=type_chart
+        )
+        damage += _SR_BASE * eff
 
     if spikes_key is not None and _grounded(pokemon):
         layers = side_conditions[spikes_key] or 1
@@ -199,21 +198,8 @@ def _match_condition(side_conditions, name: str):
     return None
 
 
-def _rock_type(type_chart):
-    from poke_env.environment.pokemon_type import PokemonType
-    try:
-        return PokemonType.ROCK
-    except AttributeError:
-        return None
-
-
 def _grounded(pokemon) -> bool:
-    from poke_env.environment.pokemon_type import PokemonType
-    try:
-        flying = PokemonType.FLYING
-    except AttributeError:
-        flying = None
-    if flying is not None and (pokemon.type_1 == flying or pokemon.type_2 == flying):
+    if pokemon.type_1 == PokemonType.FLYING or pokemon.type_2 == PokemonType.FLYING:
         return False
     ability = (getattr(pokemon, "ability", None) or "").lower().replace(" ", "")
     if ability in ("levitate", "magnetrise"):
