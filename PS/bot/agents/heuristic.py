@@ -14,7 +14,7 @@ switches. This is the floor the rest of the bot must exceed.
 Acceptance: >=95% winrate vs RandomPlayer over 500 games.
 """
 
-from poke_env.environment import MoveCategory
+from poke_env.environment.move_category import MoveCategory
 from poke_env.player import Player
 
 
