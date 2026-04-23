@@ -88,11 +88,8 @@ class ExpectimaxAgent(Player):
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
 
-        our_power = _move_power(move, attacker, defender, type_chart)
-        opp_power = self._cached_opp_power(defender, attacker, type_chart)
-
-        our_damage = our_power / _NORM
-        opp_damage = opp_power / _NORM
+        our_damage = _damage_fraction(move, attacker, defender, type_chart)
+        opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
 
         our_hp = attacker.current_hp_fraction if attacker else 1.0
         opp_hp = defender.current_hp_fraction if defender else 1.0
@@ -117,32 +114,32 @@ class ExpectimaxAgent(Player):
         if not attacker or not defender:
             return float("-inf")
 
-        opp_power = self._cached_opp_power(defender, attacker, type_chart)
-        opp_damage = opp_power / _NORM
+        opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
 
         our_hp_t1 = attacker.current_hp_fraction if attacker else 1.0
         our_after_t1 = max(0.0, our_hp_t1 - opp_damage)
         if our_after_t1 <= 0.0:
             return self._value.score_transition(battle, 0.0, defender.current_hp_fraction)
 
-        boost_factor = _setup_boost_multiplier(move, attacker)
-        if boost_factor <= 1.0:
+        atk_boost = move.boosts.get("atk", 0) if move.boosts else 0
+        spa_boost = move.boosts.get("spa", 0) if move.boosts else 0
+        if atk_boost <= 0 and spa_boost <= 0:
             return float("-inf")
 
-        best_our_power = 0.0
+        best_our_damage_t2 = 0.0
         for m in battle.available_moves:
-            if (m.base_power or 0) > 0:
-                best_our_power = max(best_our_power, _move_power(m, attacker, defender, type_chart))
-
-        boosted_power = best_our_power * boost_factor
-        our_damage_t2 = boosted_power / _NORM
+            if (m.base_power or 0) <= 0:
+                continue
+            boost = atk_boost if _is_physical_move(m) else spa_boost
+            dmg = _damage_fraction(m, attacker, defender, type_chart, atk_boost=boost)
+            best_our_damage_t2 = max(best_our_damage_t2, dmg)
 
         if _effective_speed(attacker, use_actual=True) >= _effective_speed(defender, use_actual=False):
-            opp_after = max(0.0, defender.current_hp_fraction - our_damage_t2)
+            opp_after = max(0.0, defender.current_hp_fraction - best_our_damage_t2)
             our_after = max(0.0, our_after_t1 - (opp_damage if opp_after > 0.0 else 0.0))
         else:
             our_after = max(0.0, our_after_t1 - opp_damage)
-            opp_after = max(0.0, defender.current_hp_fraction - (our_damage_t2 if our_after > 0.0 else 0.0))
+            opp_after = max(0.0, defender.current_hp_fraction - (best_our_damage_t2 if our_after > 0.0 else 0.0))
 
         return self._value.score_transition(battle, our_after, opp_after)
 
@@ -157,8 +154,7 @@ class ExpectimaxAgent(Player):
         if not attacker or not defender:
             return float("-inf")
 
-        opp_power = self._cached_opp_power(defender, attacker, type_chart)
-        opp_damage = opp_power / _NORM
+        opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
 
         hp_recovered = float(move.heal) if move.heal else 0.5
         net_gain = hp_recovered - opp_damage
@@ -179,9 +175,9 @@ class ExpectimaxAgent(Player):
 
     def _eval_switch(self, pokemon, battle, type_chart) -> float:
         opp = battle.opponent_active_pokemon
-        opp_power = self._cached_opp_power(opp, pokemon, type_chart)
+        opp_damage = self._cached_opp_damage(opp, pokemon, type_chart)
         hazard = _hazard_damage(pokemon, battle.side_conditions, type_chart)
-        our_after = max(0.0, pokemon.current_hp_fraction - hazard - opp_power / _NORM)
+        our_after = max(0.0, pokemon.current_hp_fraction - hazard - opp_damage)
         opp_after = opp.current_hp_fraction if opp else 1.0
 
         base_score = self._value.score_transition(battle, our_after, opp_after)
@@ -189,13 +185,13 @@ class ExpectimaxAgent(Player):
         offensive_bonus = _switch_offensive_bonus(pokemon, opp, type_chart)
         return base_score + offensive_bonus
 
-    def _cached_opp_power(self, opp, our_pokemon, type_chart) -> float:
-        """Memoized opponent power lookup."""
+    def _cached_opp_damage(self, opp, our_pokemon, type_chart) -> float:
+        """Memoized opponent damage fraction lookup."""
         if not opp or not our_pokemon:
             return 0.0
         key = (id(opp), id(our_pokemon))
         if key not in self._opp_power_cache:
-            self._opp_power_cache[key] = _opp_power_vs(opp, our_pokemon, type_chart)
+            self._opp_power_cache[key] = _max_opp_damage_fraction(opp, our_pokemon, type_chart)
         return self._opp_power_cache[key]
 
 
@@ -361,7 +357,7 @@ def _best_forced_switch(battle, type_chart):
     opp = battle.opponent_active_pokemon
     return max(
         battle.available_switches,
-        key=lambda p: p.current_hp_fraction - _hazard_damage(p, battle.side_conditions, type_chart) - _opp_power_vs(opp, p, type_chart) / _NORM,
+        key=lambda p: p.current_hp_fraction - _hazard_damage(p, battle.side_conditions, type_chart) - _max_opp_damage_fraction(opp, p, type_chart),
     )
 
 
@@ -372,6 +368,121 @@ def _accuracy(move) -> float:
     if isinstance(val, bool):
         return 1.0 if val else 0.0
     return float(val)
+
+
+def _is_physical_move(move) -> bool:
+    """Check if move is physical category. False for special/status."""
+    cat = getattr(move, "category", None)
+    if cat is None:
+        return False
+    name = getattr(cat, "name", str(cat)).lower()
+    return "physical" in name
+
+
+def _estimate_hp(pokemon) -> int:
+    """Estimate max HP using Gen 9 random battle formula (85 EV, 31 IV)."""
+    if pokemon is None:
+        return 300
+    if pokemon.stats and pokemon.stats.get("hp"):
+        return pokemon.stats["hp"]
+    base_hp = (pokemon.base_stats or {}).get("hp") or 100
+    level = getattr(pokemon, "level", None) or 80
+    return int((2 * base_hp + 52) * level / 100) + level + 10
+
+
+def _estimate_stat(pokemon, stat_name: str) -> int:
+    """Estimate a stat using Gen 9 random battle formula (85 EV, 31 IV, neutral nature).
+
+    Handles edge cases: if no physical moves, Atk EV/IV = 0.
+    If Trick Room or Gyro Ball, Speed EV/IV = 0.
+    """
+    if pokemon is None:
+        return 100
+    if pokemon.stats and pokemon.stats.get(stat_name):
+        return pokemon.stats[stat_name]
+
+    base = (pokemon.base_stats or {}).get(stat_name) or 100
+    level = getattr(pokemon, "level", None) or 80
+
+    if stat_name == "atk" and pokemon.moves:
+        has_physical = any(_is_physical_move(m) and (m.base_power or 0) > 0 for m in pokemon.moves.values())
+        if not has_physical:
+            return int(2 * base * level / 100) + 5
+
+    if stat_name == "spe" and pokemon.moves:
+        for m in pokemon.moves.values():
+            mid = _norm(m.id)
+            if mid in ("trickroom", "gyroball"):
+                return int(2 * base * level / 100) + 5
+
+    return int((2 * base + 52) * level / 100) + 5
+
+
+def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -> float:
+    """Estimate damage as fraction of defender's HP using real Gen 9 formula.
+
+    atk_boost: stage count to apply to attacker's attack stat (for setup rollouts).
+    Returns fraction in [0, 1+] (may exceed 1 for OHKOs).
+    """
+    bp = move.base_power or 0
+    if bp <= 0 or attacker is None or defender is None:
+        return 0.0
+
+    level = getattr(attacker, "level", None) or 80
+    is_physical = _is_physical_move(move)
+    atk_name = "atk" if is_physical else "spa"
+    def_name = "def" if is_physical else "spd"
+
+    A = _estimate_stat(attacker, atk_name)
+    D = _estimate_stat(defender, def_name)
+    hp = _estimate_hp(defender)
+
+    if atk_boost > 0:
+        A = int(A * _stage_to_multiplier(atk_boost))
+    elif atk_boost < 0:
+        A = int(A * 2 / (2 - atk_boost))
+
+    stab = 1.5 if move.type in attacker.types else 1.0
+    eff = move.type.damage_multiplier(defender.type_1, defender.type_2, type_chart=type_chart)
+    acc = _accuracy(move)
+
+    base_damage = ((2 * level / 5 + 2) * bp * A / D) / 50 + 2
+    return base_damage * stab * eff * acc / hp
+
+
+def _max_opp_damage_fraction(opp, our_pokemon, type_chart) -> float:
+    """Estimate opponent's best damaging move as fraction of our HP.
+
+    Uses real damage formula. Falls back to synthetic 80 BP STAB for unrevealed movesets.
+    """
+    if opp is None or our_pokemon is None:
+        return 0.0
+
+    best = 0.0
+    has_moves = False
+    for move in opp.moves.values():
+        if (move.base_power or 0) <= 0:
+            continue
+        has_moves = True
+        damage = _damage_fraction(move, opp, our_pokemon, type_chart)
+        best = max(best, damage)
+
+    if not has_moves:
+        level = getattr(opp, "level", None) or 80
+        hp = _estimate_hp(our_pokemon)
+        for opp_type in (opp.type_1, opp.type_2):
+            if opp_type is None:
+                continue
+            eff = opp_type.damage_multiplier(
+                our_pokemon.type_1, our_pokemon.type_2, type_chart=type_chart
+            )
+            A = max(_estimate_stat(opp, "atk"), _estimate_stat(opp, "spa"))
+            D = min(_estimate_stat(our_pokemon, "def"), _estimate_stat(our_pokemon, "spd"))
+            base_damage = ((2 * level / 5 + 2) * 80 * A / D) / 50 + 2
+            fallback = base_damage * 1.5 * eff / hp
+            best = max(best, fallback)
+
+    return best
 
 
 def _setup_boost_multiplier(move, attacker) -> float:
