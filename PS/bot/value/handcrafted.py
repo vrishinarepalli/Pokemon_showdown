@@ -34,16 +34,16 @@ class HandcraftedValue:
         opp_hp_after = max(0.0, min(1.0, opp_hp_after))
 
         # Our HP penalty (non-linear)
+        # 0-55% damage taken: quadratic growth (slow near 0, steep near 55%)
+        # 55-100% damage taken: linear steep growth (danger zone)
         our_hp_lost = 1.0 - our_hp_after
         if our_hp_lost <= 0.55:
-            # Log-shaped mild penalty for 0-55% damage
-            # log(1) = 0, log(1.55) ~ 0.44
-            our_penalty = -math.log(1 + our_hp_lost) * 0.35
+            # Accelerating penalty: small near 0, peaks at -0.3 at 55%
+            our_penalty = -0.3 * (our_hp_lost / 0.55) ** 2
         else:
-            # Linear steep past 55%
-            transition_penalty = -math.log(1.55) * 0.35  # Value at threshold
+            # Linear steep past 55%: continues from -0.3 down to -0.85 at KO
             beyond = (our_hp_lost - 0.55) / 0.45
-            our_penalty = transition_penalty + (-0.55 * beyond)
+            our_penalty = -0.3 - 0.55 * beyond
 
         # Opponent HP reward (linear, we want to reduce it)
         opp_reward = 1.0 - opp_hp_after
