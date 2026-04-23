@@ -37,9 +37,11 @@ class ExpectimaxAgent(Player):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._value = HandcraftedValue()
+        self._opp_power_cache = {}  # (opp_id, our_id, gen) → power
 
     def choose_move(self, battle):
         type_chart = GenData.from_gen(battle.gen).type_chart
+        self._opp_power_cache.clear()  # Fresh cache per turn
 
         if not battle.available_moves and battle.available_switches:
             return self.create_order(_best_forced_switch(battle, type_chart))
@@ -71,6 +73,8 @@ class ExpectimaxAgent(Player):
             if score > best_score:
                 best_score = score
                 best_order = self.create_order(move)
+                if is_setup and score > 0.5:
+                    break
 
         for switch in battle.available_switches:
             score = self._eval_switch(switch, battle, type_chart)
@@ -85,7 +89,7 @@ class ExpectimaxAgent(Player):
         defender = battle.opponent_active_pokemon
 
         our_power = _move_power(move, attacker, defender, type_chart)
-        opp_power = _opp_power_vs(defender, attacker, type_chart)
+        opp_power = self._cached_opp_power(defender, attacker, type_chart)
 
         our_damage = our_power / _NORM
         opp_damage = opp_power / _NORM
@@ -113,7 +117,7 @@ class ExpectimaxAgent(Player):
         if not attacker or not defender:
             return float("-inf")
 
-        opp_power = _opp_power_vs(defender, attacker, type_chart)
+        opp_power = self._cached_opp_power(defender, attacker, type_chart)
         opp_damage = opp_power / _NORM
 
         our_hp_t1 = attacker.current_hp_fraction if attacker else 1.0
@@ -153,7 +157,7 @@ class ExpectimaxAgent(Player):
         if not attacker or not defender:
             return float("-inf")
 
-        opp_power = _opp_power_vs(defender, attacker, type_chart)
+        opp_power = self._cached_opp_power(defender, attacker, type_chart)
         opp_damage = opp_power / _NORM
 
         hp_recovered = float(move.heal) if move.heal else 0.5
@@ -175,7 +179,7 @@ class ExpectimaxAgent(Player):
 
     def _eval_switch(self, pokemon, battle, type_chart) -> float:
         opp = battle.opponent_active_pokemon
-        opp_power = _opp_power_vs(opp, pokemon, type_chart)
+        opp_power = self._cached_opp_power(opp, pokemon, type_chart)
         hazard = _hazard_damage(pokemon, battle.side_conditions, type_chart)
         our_after = max(0.0, pokemon.current_hp_fraction - hazard - opp_power / _NORM)
         opp_after = opp.current_hp_fraction if opp else 1.0
@@ -184,6 +188,15 @@ class ExpectimaxAgent(Player):
 
         offensive_bonus = _switch_offensive_bonus(pokemon, opp, type_chart)
         return base_score + offensive_bonus
+
+    def _cached_opp_power(self, opp, our_pokemon, type_chart) -> float:
+        """Memoized opponent power lookup."""
+        if not opp or not our_pokemon:
+            return 0.0
+        key = (id(opp), id(our_pokemon))
+        if key not in self._opp_power_cache:
+            self._opp_power_cache[key] = _opp_power_vs(opp, our_pokemon, type_chart)
+        return self._opp_power_cache[key]
 
 
 def _move_power(move, attacker, defender, type_chart) -> float:
