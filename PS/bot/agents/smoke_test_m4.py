@@ -47,7 +47,10 @@ async def run(n_battles: int) -> None:
     for _ in range(n_battles):
         await expectimax.battle_against(heuristic, n_battles=1)
         current_count = expectimax.n_finished_battles
+        wins = expectimax.n_won_battles
+        winrate = (wins / current_count * 100) if current_count else 0.0
         pbar.update(current_count - last_count)
+        pbar.set_postfix({"wins": f"{wins}/{current_count} ({winrate:.1f}%)"})
         last_count = current_count
 
     pbar.close()
