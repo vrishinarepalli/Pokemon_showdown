@@ -156,7 +156,7 @@ class ExpectimaxAgent(Player):
         opp_power = _opp_power_vs(defender, attacker, type_chart)
         opp_damage = opp_power / _NORM
 
-        hp_recovered = (move.heal or [0, 0])[0] / (move.heal or [1, 0])[1] if move.heal else 0.0
+        hp_recovered = float(move.heal) if move.heal else 0.5
         net_gain = hp_recovered - opp_damage
 
         our_hp = attacker.current_hp_fraction if attacker else 1.0
