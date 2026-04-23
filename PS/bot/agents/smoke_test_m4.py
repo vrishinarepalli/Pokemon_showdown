@@ -15,6 +15,8 @@ Then from the PS/ directory:
 
 import argparse
 import asyncio
+import time
+from tqdm import tqdm
 
 from poke_env import AccountConfiguration, LocalhostServerConfiguration
 
@@ -38,12 +40,24 @@ async def run(n_battles: int) -> None:
         battle_format=BATTLE_FORMAT,
     )
 
-    await expectimax.battle_against(heuristic, n_battles=n_battles)
+    pbar = tqdm(total=n_battles, desc="Battles", unit="battle")
+    start_time = time.time()
+    last_count = 0
+
+    for _ in range(n_battles):
+        await expectimax.battle_against(heuristic, n_battles=1)
+        current_count = expectimax.n_finished_battles
+        pbar.update(current_count - last_count)
+        last_count = current_count
+
+    pbar.close()
+    elapsed = time.time() - start_time
 
     wins = expectimax.n_won_battles
     total = expectimax.n_finished_battles
     winrate = (wins / total * 100) if total else 0.0
-    print(f"expectimax vs heuristic: {wins} / {total} wins ({winrate:.1f}%)")
+    print(f"\nexpectimax vs heuristic: {wins} / {total} wins ({winrate:.1f}%)")
+    print(f"Time elapsed: {elapsed:.1f}s ({elapsed/total:.1f}s per battle)")
     if total >= 100 and winrate < 60.0:
         print("WARNING: below M4 acceptance threshold (>=60%).")
 
