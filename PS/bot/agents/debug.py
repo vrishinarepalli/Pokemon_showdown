@@ -1,12 +1,16 @@
-"""Debug helper: announce full team info in battle chat for spectators.
+"""Debug helper: announce full team info for spectators.
 
-Enable via env var BOT_ANNOUNCE_TEAM=1. Both bots will post their team
-(species, level, item, ability, moves, tera) to battle chat on turn 1,
-making it easy to see both teams when spectating live.
+Enable via env var BOT_ANNOUNCE_TEAM=1. Both bots will:
+1. Print team info to stderr (always visible in terminal)
+2. Attempt to post to battle chat on turn 1
+
+Prints to stderr so you see the teams immediately, plus tries chat
+so spectators in browser can see it too.
 """
 
 import asyncio
 import os
+import sys
 
 
 def should_announce() -> bool:
@@ -14,8 +18,8 @@ def should_announce() -> bool:
 
 
 def format_team(battle, username: str) -> str:
-    """Format own team info as a readable multi-line string for battle chat."""
-    lines = [f"=== {username} TEAM ==="]
+    """Format own team info as a readable multi-line string."""
+    lines = [f"=== {username} TEAM (battle={battle.battle_tag}) ==="]
     team = battle.team or {}
     for ident, mon in team.items():
         species = getattr(mon, "species", "?")
@@ -26,16 +30,13 @@ def format_team(battle, username: str) -> str:
         tera = getattr(mon, "tera_type", None)
         tera_str = f" tera={getattr(tera, 'name', tera)}" if tera else ""
         lines.append(
-            f"{species} L{level} @{item} | {ability}{tera_str} | {moves}"
+            f"  {species} L{level} @{item} | {ability}{tera_str} | {moves}"
         )
     return "\n".join(lines)
 
 
 def announce_team(player, battle) -> None:
-    """Post team info to battle chat (async-safe fire-and-forget).
-
-    Called synchronously from choose_move; schedules message on event loop.
-    """
+    """Post team info to stderr and battle chat (fire-and-forget)."""
     if not should_announce():
         return
     if getattr(battle, "_team_announced", False):
@@ -43,11 +44,16 @@ def announce_team(player, battle) -> None:
     battle._team_announced = True
 
     text = format_team(battle, player.username)
+
+    # Always print to stderr (reliable)
+    print(text, file=sys.stderr, flush=True)
+
+    # Try to send to battle chat (best-effort)
     try:
-        # Send each line separately (Showdown chat handles short messages better)
+        loop = asyncio.get_event_loop()
         for line in text.split("\n"):
-            asyncio.ensure_future(
+            loop.create_task(
                 player.ps_client.send_message(line, room=battle.battle_tag)
             )
-    except Exception:
-        pass  # Don't crash battle on announce failure
+    except Exception as e:
+        print(f"[announce] chat send failed: {e}", file=sys.stderr, flush=True)
