@@ -14,6 +14,7 @@ Acceptance: >=60% winrate vs HeuristicAgent over 500 games.
 from poke_env.data import GenData
 from poke_env.player import Player
 
+from bot.agents.debug import announce_team
 from bot.value.handcrafted import HandcraftedValue
 
 
@@ -59,6 +60,7 @@ class ExpectimaxAgent(Player):
         self._opp_power_cache = {}  # (opp_id, our_id, gen) → power
 
     def choose_move(self, battle):
+        announce_team(self, battle)
         type_chart = GenData.from_gen(battle.gen).type_chart
         self._opp_power_cache.clear()  # Fresh cache per turn
 

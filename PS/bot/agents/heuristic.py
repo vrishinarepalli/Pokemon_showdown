@@ -17,6 +17,8 @@ Acceptance: >=95% winrate vs RandomPlayer over 500 games.
 from poke_env.data import GenData
 from poke_env.player import Player
 
+from bot.agents.debug import announce_team
+
 
 STAB_MULTIPLIER = 1.5
 STATUS_MOVE_SCORE = 1.0
@@ -25,6 +27,7 @@ SWITCH_ADVANTAGE_RATIO = 1.5
 
 class HeuristicAgent(Player):
     def choose_move(self, battle):
+        announce_team(self, battle)
         type_chart = GenData.from_gen(battle.gen).type_chart
 
         if not battle.available_moves and battle.available_switches:
