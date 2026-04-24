@@ -28,11 +28,13 @@ BATTLE_FORMAT = "gen9randombattle"
 DEFAULT_BATTLES = 20
 
 
-async def run(n_battles: int) -> None:
+async def run(n_battles: int, save_replays: bool = False) -> None:
+    replay_dir = "./replays" if save_replays else None
     expectimax = ExpectimaxAgent(
         account_configuration=AccountConfiguration("ExpecM4", None),
         server_configuration=LocalhostServerConfiguration,
         battle_format=BATTLE_FORMAT,
+        save_replays=replay_dir,
     )
     heuristic = HeuristicAgent(
         account_configuration=AccountConfiguration("HeurM4", None),
@@ -73,8 +75,13 @@ def main() -> None:
         default=DEFAULT_BATTLES,
         help=f"number of battles to play (default: {DEFAULT_BATTLES})",
     )
+    parser.add_argument(
+        "--save-replays",
+        action="store_true",
+        help="save battle replays to ./replays/ (HTML files, show both teams)",
+    )
     args = parser.parse_args()
-    asyncio.run(run(args.n_battles))
+    asyncio.run(run(args.n_battles, save_replays=args.save_replays))
 
 
 if __name__ == "__main__":
