@@ -127,7 +127,18 @@ class ExpectimaxAgent(Player):
             our_after = max(0.0, our_hp - opp_damage)
             opp_after = max(0.0, opp_hp - (our_damage if our_after > 0.0 else 0.0))
 
-        return self._value.score_transition(battle, our_after, opp_after)
+        base_score = self._value.score_transition(battle, our_after, opp_after)
+
+        # Early-game caution: penalize aggressive attacks when we don't know opp's team.
+        # M3 switches aggressively to counter our reveals, so taking heavy damage
+        # early invites a punish with a counter we haven't seen yet.
+        info_deficit = _info_deficit(battle)
+        if info_deficit > 0.3 and our_after < 0.55:
+            # Risky play when we have limited information about opp team
+            risk_penalty = info_deficit * (0.55 - our_after) * 0.6
+            base_score -= risk_penalty
+
+        return base_score
 
     def _eval_setup_move(self, move, battle, type_chart) -> float:
         """Evaluate setup moves via 2-turn virtual rollout.
@@ -408,7 +419,16 @@ class ExpectimaxAgent(Player):
         base_score = self._value.score_transition(battle, our_after, opp_after)
 
         offensive_bonus = _switch_offensive_bonus(pokemon, opp, type_chart)
-        return base_score + offensive_bonus
+
+        # Early-game info-gathering bonus: reward pivots into hard resists when
+        # we don't know much about opp's team. Less commit, more scouting.
+        info_deficit = _info_deficit(battle)
+        info_bonus = 0.0
+        if info_deficit > 0.3 and opp_damage < 0.20:
+            # Hard resist switch-in during low-info phase = valuable scouting
+            info_bonus = info_deficit * 0.15
+
+        return base_score + offensive_bonus + info_bonus
 
     def _cached_opp_damage(self, opp, our_pokemon, type_chart) -> float:
         """Memoized opponent damage fraction lookup."""
@@ -554,6 +574,17 @@ def _match_condition(side_conditions, name: str):
         if label == name:
             return key
     return None
+
+
+def _info_deficit(battle) -> float:
+    """Return how little we know about opp's team, from 1.0 (nothing) to 0.0 (all revealed).
+
+    Used to encourage reserved play early game: M3 switches aggressively to counter
+    what we reveal, so taking big risks before we know their team is dangerous.
+    """
+    opp_team = battle.opponent_team or {}
+    revealed = len(opp_team)
+    return max(0.0, (6 - revealed) / 6.0)
 
 
 def _pokemon_type_names(pokemon) -> set:
