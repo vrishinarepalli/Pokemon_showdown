@@ -142,7 +142,7 @@ class ExpectimaxAgent(Player):
         info_deficit = _info_deficit(battle)
         if info_deficit > 0.3 and our_after < 0.55:
             # Risky play when we have limited information about opp team
-            risk_penalty = info_deficit * (0.55 - our_after) * 0.6
+            risk_penalty = info_deficit * (0.55 - our_after) * 0.3
             base_score -= risk_penalty
 
         return base_score
@@ -811,8 +811,8 @@ def _switch_offensive_bonus(pokemon, opp, type_chart) -> float:
             opp.type_1, opp.type_2, type_chart=type_chart
         )
         if eff >= 2.0 and stab == 1.5:
-            bonus = max(bonus, 0.25)
-        elif eff >= 2.0:
             bonus = max(bonus, 0.15)
+        elif eff >= 2.0:
+            bonus = max(bonus, 0.10)
 
     return bonus
