@@ -32,6 +32,25 @@ _RECOVERY_MOVES = {
 }
 _MIN_PP_PENALTY = 3  # Penalize moves with less than this much PP remaining
 
+_HAZARD_MOVES = {"stealthrock", "spikes", "toxicspikes", "stickyweb"}
+
+_STATUS_MOVES = {
+    "willowisp": "burn",
+    "toxic": "badpoison",
+    "toxicthread": "poison",
+    "thunderwave": "paralyze",
+    "sleeppowder": "sleep",
+    "spore": "sleep",
+    "lovelykiss": "sleep",
+    "hypnosis": "sleep",
+    "glare": "paralyze",
+    "bodyslam": None,  # 30% paralysis chance secondary - don't eval as status
+    "stunspore": "paralyze",
+    "poisonpowder": "poison",
+    "poisongas": "poison",
+    "willowish": "burn",
+}
+
 
 class ExpectimaxAgent(Player):
     def __init__(self, *args, **kwargs):
@@ -60,13 +79,20 @@ class ExpectimaxAgent(Player):
             if (move.current_pp or 0) == 0:
                 continue
 
+            mid = _norm(move.id)
             is_setup = move.boosts and any(move.boosts.values()) and (move.base_power or 0) == 0
-            is_recovery = _norm(move.id) in _RECOVERY_MOVES
+            is_recovery = mid in _RECOVERY_MOVES
+            is_hazard = mid in _HAZARD_MOVES
+            is_status = mid in _STATUS_MOVES and _STATUS_MOVES[mid] is not None
 
             if is_setup:
                 score = self._eval_setup_move(move, battle, type_chart)
             elif is_recovery:
                 score = self._eval_recovery_move(move, battle, type_chart)
+            elif is_hazard:
+                score = self._eval_hazard_move(move, battle, type_chart)
+            elif is_status:
+                score = self._eval_status_move(move, battle, type_chart)
             else:
                 score = self._eval_move(move, battle, type_chart)
 
@@ -193,6 +219,146 @@ class ExpectimaxAgent(Player):
             pp_penalty = -0.1
 
         return base_score + stall_bonus + pp_penalty
+
+    def _eval_hazard_move(self, move, battle, type_chart) -> float:
+        """Evaluate hazard-setting moves (Stealth Rock, Spikes, Toxic Spikes, Sticky Web).
+
+        Value scales with opponent's remaining Pokemon (more switches = more value)
+        and hazard effectiveness. Don't set if already up or opponent low on mons.
+        """
+        attacker = battle.active_pokemon
+        defender = battle.opponent_active_pokemon
+        if not attacker or not defender:
+            return float("-inf")
+
+        mid = _norm(move.id)
+        opp_side = battle.opponent_side_conditions or {}
+
+        # Don't re-set existing hazards
+        if mid == "stealthrock":
+            if _match_condition(opp_side, "stealthrock") is not None:
+                return float("-inf")
+            base_value = 0.35  # High value - works vs most mons
+        elif mid == "spikes":
+            existing = _match_condition(opp_side, "spikes")
+            layers = opp_side.get(existing, 0) if existing else 0
+            if layers >= 3:
+                return float("-inf")
+            base_value = 0.25 - layers * 0.08  # Diminishing returns
+        elif mid == "toxicspikes":
+            existing = _match_condition(opp_side, "toxicspikes")
+            layers = opp_side.get(existing, 0) if existing else 0
+            if layers >= 2:
+                return float("-inf")
+            base_value = 0.20 - layers * 0.08
+        elif mid == "stickyweb":
+            if _match_condition(opp_side, "stickyweb") is not None:
+                return float("-inf")
+            base_value = 0.20
+        else:
+            return float("-inf")
+
+        # Count opp mons with HP remaining (each future switch = more value)
+        opp_team = battle.opponent_team or {}
+        opp_mons_left = sum(
+            1 for p in opp_team.values()
+            if p and (p.current_hp_fraction or 0) > 0
+        )
+        opp_mons_left = max(opp_mons_left, 2)  # Always assume at least 2 left
+
+        # Scale value by number of remaining switches we expect
+        value = base_value * min(1.0, (opp_mons_left - 1) / 4.0)
+
+        # Pay the cost of taking a hit while setting up
+        opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
+        our_hp = attacker.current_hp_fraction if attacker else 1.0
+        our_after = max(0.0, our_hp - opp_damage)
+
+        # If we faint setting up, it's only worth it if we'd lose anyway
+        if our_after <= 0.0 and our_hp < 0.3:
+            return float("-inf")
+
+        opp_hp = defender.current_hp_fraction if defender else 1.0
+        base_score = self._value.score_transition(battle, our_after, opp_hp)
+
+        return base_score + value
+
+    def _eval_status_move(self, move, battle, type_chart) -> float:
+        """Evaluate status-inflicting moves (Will-O-Wisp, Toxic, Thunder Wave, etc.).
+
+        Value based on target's vulnerability and expected residual damage
+        over remaining turns.
+        """
+        attacker = battle.active_pokemon
+        defender = battle.opponent_active_pokemon
+        if not attacker or not defender:
+            return float("-inf")
+
+        mid = _norm(move.id)
+        status_type = _STATUS_MOVES.get(mid)
+        if not status_type:
+            return float("-inf")
+
+        # Don't re-apply if opp already statused
+        if defender.status is not None:
+            return float("-inf")
+
+        # Immunity checks
+        if status_type == "burn" and "FIRE" in _pokemon_type_names(defender):
+            return float("-inf")
+        if status_type in ("poison", "badpoison"):
+            types = _pokemon_type_names(defender)
+            if "POISON" in types or "STEEL" in types:
+                return float("-inf")
+        if status_type == "paralyze" and "ELECTRIC" in _pokemon_type_names(defender):
+            return float("-inf")
+        if status_type == "sleep":
+            # Sleep Powder etc. miss Grass types and Overcoat/Safety Goggles mons
+            if mid in ("sleeppowder", "spore", "stunspore", "poisonpowder"):
+                if "GRASS" in _pokemon_type_names(defender):
+                    return float("-inf")
+            if _norm(getattr(defender, "ability", None)) in ("overcoat", "insomnia", "vitalspirit"):
+                return float("-inf")
+
+        # Accuracy
+        acc = _accuracy(move)
+
+        # Value by status type
+        if status_type == "burn":
+            # Halves physical damage. Huge if opp is physical attacker.
+            base_atk = (defender.base_stats or {}).get("atk") or 100
+            base_spa = (defender.base_stats or {}).get("spa") or 100
+            physical_inclined = base_atk > base_spa
+            base_value = 0.30 if physical_inclined else 0.15
+            # Plus burn residual (1/16 per turn, ~4 turns expected)
+            base_value += 0.10
+        elif status_type == "badpoison":
+            # Toxic: escalating damage, huge vs bulky mons
+            base_value = 0.25
+        elif status_type == "poison":
+            # Regular poison: 1/8 per turn
+            base_value = 0.15
+        elif status_type == "paralyze":
+            # 25% skip turn + 50% speed drop
+            base_value = 0.20
+        elif status_type == "sleep":
+            # 1-3 turns of no action
+            base_value = 0.30
+        else:
+            base_value = 0.10
+
+        # Pay the cost of taking a hit while statusing
+        opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
+        our_hp = attacker.current_hp_fraction if attacker else 1.0
+        our_after = max(0.0, our_hp - opp_damage)
+
+        if our_after <= 0.0 and our_hp < 0.3:
+            return float("-inf")
+
+        opp_hp = defender.current_hp_fraction if defender else 1.0
+        base_score = self._value.score_transition(battle, our_after, opp_hp)
+
+        return base_score + base_value * acc
 
     def _eval_switch(self, pokemon, battle, type_chart) -> float:
         opp = battle.opponent_active_pokemon
@@ -350,6 +516,17 @@ def _match_condition(side_conditions, name: str):
         if label == name:
             return key
     return None
+
+
+def _pokemon_type_names(pokemon) -> set:
+    """Return uppercase type names for a Pokemon (e.g. {'FIRE', 'FLYING'})."""
+    if pokemon is None:
+        return set()
+    names = set()
+    for t in (pokemon.type_1, pokemon.type_2):
+        if t is not None:
+            names.add(getattr(t, "name", str(t)).upper())
+    return names
 
 
 def _rock_effectiveness(pokemon, type_chart) -> float:
