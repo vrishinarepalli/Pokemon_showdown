@@ -144,10 +144,12 @@ class ExpectimaxAgent(Player):
         return self._value.score_transition(battle, our_after, opp_after)
 
     def _eval_recovery_move(self, move, battle, type_chart) -> float:
-        """Evaluate recovery moves via stall/outlast logic.
+        """Evaluate recovery moves considering actual effective healing.
 
-        Value = our HP restored vs opponent's best damage per turn.
-        Stall wins if we heal more than we take per turn.
+        - Caps healing at 100% HP (no wasted heal reward)
+        - Adds Leftovers passive heal (+1/16 per turn) if held
+        - Rewards net-positive healing (heal > damage taken = stall win)
+        - Skip healing if we'd faint this turn (use attack instead)
         """
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
@@ -155,21 +157,40 @@ class ExpectimaxAgent(Player):
             return float("-inf")
 
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
-
-        hp_recovered = float(move.heal) if move.heal else 0.5
-        net_gain = hp_recovered - opp_damage
-
         our_hp = attacker.current_hp_fraction if attacker else 1.0
-        our_after = min(1.0, max(0.0, our_hp - opp_damage + hp_recovered))
-        opp_after = defender.current_hp_fraction
+        opp_hp = defender.current_hp_fraction
 
-        base_score = self._value.score_transition(battle, our_after, opp_after)
+        # Raw heal amount (most recovery moves = 0.5)
+        hp_recovered = float(move.heal) if move.heal else 0.5
 
+        # Compute HP state: take damage first, then heal, then leftovers
+        hp_after_damage = max(0.0, our_hp - opp_damage)
+
+        # Don't heal if we'd faint this turn (better to attack)
+        if hp_after_damage <= 0.0:
+            return float("-inf")
+
+        hp_after_heal = min(1.0, hp_after_damage + hp_recovered)
+
+        # Leftovers adds 1/16 on end of turn
+        if _norm(getattr(attacker, "item", None)) == "leftovers":
+            hp_after_heal = min(1.0, hp_after_heal + 1 / 16)
+
+        # Effective heal (accounts for waste if capped at 1.0)
+        effective_heal = hp_after_heal - hp_after_damage
+
+        base_score = self._value.score_transition(battle, hp_after_heal, opp_hp)
+
+        # Stall win: net HP gain (heal - damage) > threshold
+        net_gain = effective_heal - opp_damage
+        stall_bonus = 0.0
+        if net_gain > 0.05:
+            stall_bonus = min(0.2, net_gain * 0.4)  # Scaled by magnitude
+
+        # PP penalty for low PP (finite healing)
         pp_penalty = 0.0
         if (move.current_pp or 0) < _MIN_PP_PENALTY:
             pp_penalty = -0.1
-
-        stall_bonus = 0.2 if net_gain > 0.05 else 0.0
 
         return base_score + stall_bonus + pp_penalty
 
