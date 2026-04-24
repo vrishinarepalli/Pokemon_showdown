@@ -142,7 +142,7 @@ class ExpectimaxAgent(Player):
         info_deficit = _info_deficit(battle)
         if info_deficit > 0.3 and our_after < 0.55:
             # Risky play when we have limited information about opp team
-            risk_penalty = info_deficit * (0.55 - our_after) * 0.3
+            risk_penalty = info_deficit * (0.55 - our_after) * 0.6
             base_score -= risk_penalty
 
         return base_score
