@@ -250,6 +250,14 @@ class ExpectimaxAgent(Player):
             layers = opp_side.get(existing, 0) if existing else 0
             if layers >= 2:
                 return float("-inf")
+            # Check if opp has any revealed Poison-type (absorbs T-Spikes on switch-in)
+            opp_team = battle.opponent_team or {}
+            has_poison_absorber = any(
+                p and "POISON" in _pokemon_type_names(p)
+                for p in opp_team.values()
+            )
+            if has_poison_absorber:
+                return float("-inf")  # Wasted turn - poison type will remove layers
             base_value = 0.20 - layers * 0.08
         elif mid == "stickyweb":
             if _match_condition(opp_side, "stickyweb") is not None:
