@@ -38,12 +38,12 @@ class HandcraftedValue:
         # 55-100% damage taken: linear steep growth (danger zone)
         our_hp_lost = 1.0 - our_hp_after
         if our_hp_lost <= 0.55:
-            # Accelerating penalty: small near 0, peaks at -0.25 at 55%
-            our_penalty = -0.25 * (our_hp_lost / 0.55) ** 2
+            # Accelerating penalty: small near 0, peaks at -0.3 at 55%
+            our_penalty = -0.3 * (our_hp_lost / 0.55) ** 2
         else:
-            # Linear steep past 55%: continues from -0.25 down to -0.80 at KO
+            # Linear steep past 55%: continues from -0.3 down to -0.85 at KO
             beyond = (our_hp_lost - 0.55) / 0.45
-            our_penalty = -0.25 - 0.55 * beyond
+            our_penalty = -0.3 - 0.55 * beyond
 
         # Opponent HP reward (linear, we want to reduce it)
         opp_reward = 1.0 - opp_hp_after
