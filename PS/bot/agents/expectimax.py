@@ -116,7 +116,12 @@ class ExpectimaxAgent(Player):
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
 
-        our_damage = _damage_fraction(move, attacker, defender, type_chart)
+        # Read our active boosts so Swords Dance, Nasty Plot, etc. are reflected
+        boosts = (attacker.boosts if attacker else None) or {}
+        is_physical = _is_physical_move(move)
+        atk_boost = boosts.get("atk" if is_physical else "spa", 0)
+
+        our_damage = _damage_fraction(move, attacker, defender, type_chart, atk_boost=atk_boost)
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
 
         our_hp = attacker.current_hp_fraction if attacker else 1.0
@@ -727,13 +732,18 @@ def _max_opp_damage_fraction(opp, our_pokemon, type_chart) -> float:
     if opp is None or our_pokemon is None:
         return 0.0
 
+    # Read opponent boosts so their Swords Dance / Nasty Plot is reflected
+    opp_boosts = opp.boosts or {}
+
     best = 0.0
     has_moves = False
     for move in opp.moves.values():
         if (move.base_power or 0) <= 0:
             continue
         has_moves = True
-        damage = _damage_fraction(move, opp, our_pokemon, type_chart)
+        is_physical = _is_physical_move(move)
+        boost = opp_boosts.get("atk" if is_physical else "spa", 0)
+        damage = _damage_fraction(move, opp, our_pokemon, type_chart, atk_boost=boost)
         best = max(best, damage)
 
     if not has_moves:
