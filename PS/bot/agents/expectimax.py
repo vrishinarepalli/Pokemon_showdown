@@ -325,25 +325,48 @@ class ExpectimaxAgent(Player):
 
         # Value by status type
         if status_type == "burn":
-            # Halves physical damage. Huge if opp is physical attacker.
+            # Halves physical damage + 1/16 residual.
+            # Value scales with how physically inclined the target is.
             base_atk = (defender.base_stats or {}).get("atk") or 100
             base_spa = (defender.base_stats or {}).get("spa") or 100
-            physical_inclined = base_atk > base_spa
-            base_value = 0.30 if physical_inclined else 0.15
-            # Plus burn residual (1/16 per turn, ~4 turns expected)
-            base_value += 0.10
+            if base_atk > base_spa * 1.3:
+                base_value = 0.40  # Strongly physical - huge value
+            elif base_spa > base_atk * 1.3:
+                base_value = 0.05  # Strongly special - nearly useless (residual only)
+            else:
+                base_value = 0.20  # Balanced/mixed
+            base_value += 0.08  # Residual burn damage component
         elif status_type == "badpoison":
-            # Toxic: escalating damage, huge vs bulky mons
-            base_value = 0.25
+            # Toxic: escalating damage, value scales with target's bulk.
+            # Bulk = HP * (Def + SpDef) / 100000 (normalized to ~0-1 range)
+            base_hp = (defender.base_stats or {}).get("hp") or 100
+            base_def = (defender.base_stats or {}).get("def") or 100
+            base_spd = (defender.base_stats or {}).get("spd") or 100
+            bulk = (base_hp * (base_def + base_spd)) / 100000.0
+            # Scale: 0.15 minimum, up to 0.45 for ultra-bulky (Blissey-tier)
+            base_value = min(0.45, 0.15 + bulk * 0.25)
         elif status_type == "poison":
-            # Regular poison: 1/8 per turn
-            base_value = 0.15
+            # Regular poison: 1/8 per turn, similar bulk-scaling but less impactful
+            base_hp = (defender.base_stats or {}).get("hp") or 100
+            base_def = (defender.base_stats or {}).get("def") or 100
+            base_spd = (defender.base_stats or {}).get("spd") or 100
+            bulk = (base_hp * (base_def + base_spd)) / 100000.0
+            base_value = min(0.30, 0.10 + bulk * 0.15)
         elif status_type == "paralyze":
-            # 25% skip turn + 50% speed drop
-            base_value = 0.20
+            # 25% skip turn + 50% speed drop. Value scales with opp's speed -
+            # paralyzing a fast threat is huge, paralyzing a slow mon is minor.
+            base_spe = (defender.base_stats or {}).get("spe") or 100
+            if base_spe >= 120:
+                base_value = 0.30  # Fast threat - paralysis neuters it
+            elif base_spe >= 100:
+                base_value = 0.22  # Moderately fast
+            elif base_spe >= 80:
+                base_value = 0.15  # Middling
+            else:
+                base_value = 0.08  # Already slow, paralysis less valuable
         elif status_type == "sleep":
-            # 1-3 turns of no action
-            base_value = 0.30
+            # 1-3 turns of no action - always high value regardless of target.
+            base_value = 0.35
         else:
             base_value = 0.10
 
