@@ -101,8 +101,6 @@ class ExpectimaxAgent(Player):
             if score > best_score:
                 best_score = score
                 best_order = self.create_order(move)
-                if is_setup and score > 0.5:
-                    break
 
         for switch in battle.available_switches:
             score = self._eval_switch(switch, battle, type_chart)
