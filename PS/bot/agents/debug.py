@@ -1,16 +1,16 @@
-"""Debug helper: announce full team info for spectators.
+"""Debug helper: announce full team info in battle chat.
 
-Enable via env var BOT_ANNOUNCE_TEAM=1. Both bots will:
-1. Print team info to stderr (always visible in terminal)
-2. Attempt to post to battle chat on turn 1
-
-Prints to stderr so you see the teams immediately, plus tries chat
-so spectators in browser can see it too.
+Enable via env var BOT_ANNOUNCE_TEAM=1. Both bots post their team info
+to battle chat on turn 1. Spectators must click "Join chat" at bottom of
+the battle window to see the messages.
 """
 
 import asyncio
 import os
 import sys
+
+
+_pending_tasks = []  # Hold task refs to prevent garbage collection
 
 
 def should_announce() -> bool:
@@ -19,7 +19,7 @@ def should_announce() -> bool:
 
 def format_team(battle, username: str) -> str:
     """Format own team info as a readable multi-line string."""
-    lines = [f"=== {username} TEAM (battle={battle.battle_tag}) ==="]
+    lines = [f"=== {username} TEAM ==="]
     team = battle.team or {}
     for ident, mon in team.items():
         species = getattr(mon, "species", "?")
@@ -35,8 +35,21 @@ def format_team(battle, username: str) -> str:
     return "\n".join(lines)
 
 
+def _schedule(coro):
+    """Schedule a coroutine and hold a reference to prevent GC."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.get_event_loop()
+    task = loop.create_task(coro)
+    _pending_tasks.append(task)
+    # Cleanup completed tasks to avoid leak
+    _pending_tasks[:] = [t for t in _pending_tasks if not t.done()]
+    return task
+
+
 def announce_team(player, battle) -> None:
-    """Post team info to stderr and battle chat (fire-and-forget)."""
+    """Post team info to battle chat."""
     if not should_announce():
         return
     if getattr(battle, "_team_announced", False):
@@ -45,15 +58,12 @@ def announce_team(player, battle) -> None:
 
     text = format_team(battle, player.username)
 
-    # Always print to stderr (reliable)
-    print(text, file=sys.stderr, flush=True)
+    # Print to terminal so we can confirm it ran
+    print(f"[announce] sending team to {battle.battle_tag}", file=sys.stderr, flush=True)
 
-    # Try to send to battle chat (best-effort)
-    try:
-        loop = asyncio.get_event_loop()
-        for line in text.split("\n"):
-            loop.create_task(
-                player.ps_client.send_message(line, room=battle.battle_tag)
-            )
-    except Exception as e:
-        print(f"[announce] chat send failed: {e}", file=sys.stderr, flush=True)
+    # Send each line separately to the battle chat room
+    for line in text.split("\n"):
+        try:
+            _schedule(player.ps_client.send_message(line, room=battle.battle_tag))
+        except Exception as e:
+            print(f"[announce] send failed: {e}", file=sys.stderr, flush=True)
