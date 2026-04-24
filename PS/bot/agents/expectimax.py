@@ -101,6 +101,8 @@ class ExpectimaxAgent(Player):
             if score > best_score:
                 best_score = score
                 best_order = self.create_order(move)
+                if is_setup and score > 0.5:
+                    break
 
         for switch in battle.available_switches:
             score = self._eval_switch(switch, battle, type_chart)
@@ -809,8 +811,8 @@ def _switch_offensive_bonus(pokemon, opp, type_chart) -> float:
             opp.type_1, opp.type_2, type_chart=type_chart
         )
         if eff >= 2.0 and stab == 1.5:
-            bonus = max(bonus, 0.15)
+            bonus = max(bonus, 0.25)
         elif eff >= 2.0:
-            bonus = max(bonus, 0.10)
+            bonus = max(bonus, 0.15)
 
     return bonus
