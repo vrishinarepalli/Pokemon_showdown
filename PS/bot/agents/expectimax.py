@@ -319,6 +319,13 @@ class ExpectimaxAgent(Player):
                     return float("-inf")
             if _norm(getattr(defender, "ability", None)) in ("overcoat", "insomnia", "vitalspirit"):
                 return float("-inf")
+            # Sleep Clause: only one opp mon can be asleep at a time
+            opp_team = battle.opponent_team or {}
+            for p in opp_team.values():
+                if p and p.status is not None:
+                    status_name = getattr(p.status, "name", str(p.status)).upper()
+                    if "SLP" in status_name or "SLEEP" in status_name:
+                        return float("-inf")
 
         # Accuracy
         acc = _accuracy(move)
