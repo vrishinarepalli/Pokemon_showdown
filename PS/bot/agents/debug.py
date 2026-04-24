@@ -1,15 +1,20 @@
-"""Debug helper: announce full team info in battle chat.
+"""Debug helper: dump full team info to terminal and file for spectators.
 
-Enable via env var BOT_ANNOUNCE_TEAM=1. Both bots post their team info
-to battle chat on turn 1.
+Enable via env var BOT_ANNOUNCE_TEAM=1. Both bots will:
+1. Print their full team info to terminal (stdout, pretty formatted)
+2. Write to per-battle log file ./battle_teams/{battle_id}.txt
+
+Chat messages are blocked for unregistered bot accounts, so we use terminal
+and files instead. Use `tail -f battle_teams/*.txt` or cat the file while
+spectating the replay.
 """
 
-import asyncio
 import os
 import sys
+from pathlib import Path
 
 
-_pending_tasks = []
+LOG_DIR = Path("./battle_teams")
 
 
 def should_announce() -> bool:
@@ -17,60 +22,47 @@ def should_announce() -> bool:
 
 
 def format_team(battle, username: str) -> str:
-    """Format own team info. Uses ';' separators (Showdown protocol uses '|')."""
-    lines = [f"=== {username} TEAM ==="]
+    """Format own team info as a readable multi-line string."""
+    lines = [f"{'='*70}", f"=== {username} TEAM (battle={battle.battle_tag}) ===", f"{'='*70}"]
     team = battle.team or {}
     for ident, mon in team.items():
         species = getattr(mon, "species", "?")
         level = getattr(mon, "level", "?")
         item = getattr(mon, "item", None) or "none"
         ability = getattr(mon, "ability", None) or "?"
-        moves = ",".join(m.id for m in (mon.moves or {}).values()) or "?"
+        moves = ", ".join(m.id for m in (mon.moves or {}).values()) or "?"
         tera = getattr(mon, "tera_type", None)
-        tera_str = f" tera={getattr(tera, 'name', tera)}" if tera else ""
+        tera_str = f" | tera={getattr(tera, 'name', tera)}" if tera else ""
+        hp = getattr(mon, "current_hp_fraction", 1.0)
+        active_marker = " [ACTIVE]" if getattr(mon, "active", False) else ""
         lines.append(
-            f"{species} L{level} @{item} ; {ability}{tera_str} ; {moves}"
+            f"  {species} L{level}{active_marker}\n"
+            f"    item: {item}\n"
+            f"    ability: {ability}{tera_str}\n"
+            f"    moves: {moves}\n"
+            f"    hp: {hp*100:.0f}%"
         )
-    return lines  # Return list of lines, not joined string
-
-
-def _task_error_callback(task):
-    """Print task errors so we can see what failed."""
-    try:
-        exc = task.exception()
-        if exc:
-            print(f"[announce] task failed: {exc}", file=sys.stderr, flush=True)
-        else:
-            print(f"[announce] task sent OK", file=sys.stderr, flush=True)
-    except Exception:
-        pass
-
-
-def _schedule_send(player, room, message):
-    try:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.get_event_loop()
-        task = loop.create_task(player.ps_client.send_message(message, room=room))
-        task.add_done_callback(_task_error_callback)
-        _pending_tasks.append(task)
-        _pending_tasks[:] = [t for t in _pending_tasks if not t.done()]
-    except Exception as e:
-        print(f"[announce] schedule failed: {e}", file=sys.stderr, flush=True)
+    return "\n".join(lines)
 
 
 def announce_team(player, battle) -> None:
-    """Post team info to battle chat."""
+    """Print team info to terminal and write to file."""
     if not should_announce():
         return
     if getattr(battle, "_team_announced", False):
         return
     battle._team_announced = True
 
-    lines = format_team(battle, player.username)
-    print(f"[announce] {player.username} posting {len(lines)} lines to {battle.battle_tag}",
-          file=sys.stderr, flush=True)
+    text = format_team(battle, player.username)
 
-    for line in lines:
-        _schedule_send(player, battle.battle_tag, line)
+    # Print to terminal (visible while watching battles)
+    print(text, file=sys.stdout, flush=True)
+
+    # Also write to a file for later review
+    try:
+        LOG_DIR.mkdir(exist_ok=True)
+        battle_file = LOG_DIR / f"{battle.battle_tag.replace('/', '_')}.txt"
+        with battle_file.open("a") as f:
+            f.write(text + "\n\n")
+    except Exception as e:
+        print(f"[announce] file write failed: {e}", file=sys.stderr, flush=True)
