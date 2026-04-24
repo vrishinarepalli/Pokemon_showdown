@@ -79,18 +79,103 @@ def _pretty_name(name: str) -> str:
     return name.replace("_", " ").replace("-", " ").title()
 
 
+def _format_species(mon) -> str:
+    """Format species name for Showdown (e.g. 'landorustherian' -> 'Landorus-Therian').
+
+    Uses mon.base_species if available to detect forms reliably.
+    """
+    species = (getattr(mon, "species", "") or "").lower()
+    base = (getattr(mon, "base_species", species) or species).lower()
+
+    if not species:
+        return "?"
+
+    # Known form suffix → display form (ordered longest first for greedy matching)
+    form_map = [
+        ("rapidstrike", "Rapid-Strike"),
+        ("singlestrike", "Single-Strike"),
+        ("bloodmoon", "Bloodmoon"),
+        ("wellspring", "Wellspring"),
+        ("hearthflame", "Hearthflame"),
+        ("cornerstone", "Cornerstone"),
+        ("tealmask", "Teal-Mask"),
+        ("gmax", "Gmax"),
+        ("gigantamax", "Gmax"),
+        ("therian", "Therian"),
+        ("incarnate", "Incarnate"),
+        ("crowned", "Crowned"),
+        ("origin", "Origin"),
+        ("primal", "Primal"),
+        ("altered", "Altered"),
+        ("galar", "Galar"),
+        ("alola", "Alola"),
+        ("hisui", "Hisui"),
+        ("paldea", "Paldea"),
+        ("mega", "Mega"),
+        ("midnight", "Midnight"),
+        ("dusk", "Dusk"),
+        ("dawn", "Dawn"),
+        ("midday", "Midday"),
+        ("lowkey", "Low-Key"),
+        ("amped", "Amped"),
+        ("bluestriped", "Blue-Striped"),
+        ("whitestriped", "White-Striped"),
+        ("zen", "Zen"),
+        ("sandy", "Sandy"),
+        ("trash", "Trash"),
+        ("heat", "Heat"),
+        ("wash", "Wash"),
+        ("frost", "Frost"),
+        ("fan", "Fan"),
+        ("mow", "Mow"),
+        ("attack", "Attack"),
+        ("defense", "Defense"),
+        ("speed", "Speed"),
+        ("black", "Black"),
+        ("white", "White"),
+        ("combat", "Combat"),
+        ("blaze", "Blaze"),
+        ("aqua", "Aqua"),
+        ("female", "F"),
+        ("male", "M"),
+        # Arceus plate types
+        ("flying", "Flying"), ("fighting", "Fighting"), ("poison", "Poison"),
+        ("ground", "Ground"), ("rock", "Rock"), ("bug", "Bug"),
+        ("ghost", "Ghost"), ("steel", "Steel"), ("fire", "Fire"),
+        ("water", "Water"), ("grass", "Grass"), ("electric", "Electric"),
+        ("psychic", "Psychic"), ("ice", "Ice"), ("dragon", "Dragon"),
+        ("dark", "Dark"), ("fairy", "Fairy"),
+    ]
+
+    # If species has a recognized form suffix, split it
+    if species != base and base and species.startswith(base):
+        form_part = species[len(base):]
+        for key, formatted in form_map:
+            if form_part == key:
+                return f"{base.title()}-{formatted}"
+        # Unknown form, fall through to title case with original hyphens
+        return f"{base.title()}-{form_part.title()}"
+
+    # No distinct form — try suffix matching on full species
+    for key, formatted in form_map:
+        if species.endswith(key) and len(species) > len(key):
+            base_part = species[:-len(key)]
+            return f"{base_part.title()}-{formatted}"
+
+    return species.title()
+
+
 def format_team(battle, username: str) -> str:
     """Format team in Showdown teambuilder import/export format."""
     out = []
     team = battle.team or {}
     for ident, mon in team.items():
-        species = getattr(mon, "species", "?")
         level = getattr(mon, "level", 100)
         item_raw = getattr(mon, "item", None)
         ability_raw = getattr(mon, "ability", None) or "?"
         tera = getattr(mon, "tera_type", None)
 
-        header = species.title()
+        header = _format_species(mon)
         if item_raw:
             header += f" @ {_pretty_name(item_raw)}"
         out.append(header)
