@@ -46,7 +46,8 @@ class HandcraftedValue:
             our_penalty = -0.3 - 0.55 * beyond
 
         # Opponent HP reward (linear, we want to reduce it)
-        opp_reward = 1.0 - opp_hp_after
+        # Scaled 1.5x to weight damage-dealing more heavily than damage-prevention
+        opp_reward = (1.0 - opp_hp_after) * 1.5
 
         # KO bonus for finishing the opponent
         ko_bonus = 0.2 if opp_hp_after <= 0.0 else 0.0
