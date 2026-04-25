@@ -249,6 +249,13 @@ class ExpectimaxAgent(Player):
             risk_penalty = info_deficit * (0.55 - our_after) * 0.6
             base_score -= risk_penalty
 
+        # Tiebreakers (small bonuses, won't affect non-tied decisions):
+        # 1. Prefer STAB moves (more reliable damage, harder to resist)
+        # 2. Prefer higher raw damage (overkill = safety vs miscalculation)
+        if attacker and move.type in attacker.types:
+            base_score += 0.002  # STAB tiebreaker
+        base_score += our_damage * 0.001  # Damage tiebreaker
+
         return base_score
 
     def _eval_setup_move(self, move, battle, type_chart) -> float:
