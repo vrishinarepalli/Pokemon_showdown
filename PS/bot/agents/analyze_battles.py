@@ -109,6 +109,15 @@ def analyze_logs(log_file: str = "./battle_logs.json", show_switches: bool = Tru
             for turn in log["turns"][:8]:  # First 8 turns
                 print(f"\n  Turn {turn['turn']}: {turn['our_pokemon']} (HP {turn['our_hp']:.0%}) vs {turn['opp_pokemon']} (HP {turn['opp_hp']:.0%})")
 
+                # Show what opponent did last turn (visible at start of this turn)
+                opp_last_action = turn.get("opp_last_action")
+                opp_last_move = turn.get("opp_last_move")
+                opp_prev_pokemon = turn.get("opp_prev_pokemon")
+                if opp_last_action == "switch" and opp_prev_pokemon:
+                    print(f"    [Opp last turn: SWITCHED from {opp_prev_pokemon} to {turn['opp_pokemon']}]")
+                elif opp_last_move:
+                    print(f"    [Opp last turn: used {opp_last_move}]")
+
                 # Group decisions
                 moves = [d for d in turn["decisions"] if d["type"] == "move"]
                 switches = [d for d in turn["decisions"] if d["type"] == "switch"]

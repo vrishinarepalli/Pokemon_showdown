@@ -74,6 +74,7 @@ class ExpectimaxAgent(Player):
                 our_name=self.username,
                 opp_name=battle.opponent_username,
             )
+            self._prev_opp_pokemon = None  # Track opponent's pokemon for switch detection
 
         # Record teams on first turn
         if battle.turn == 1:
@@ -92,7 +93,28 @@ class ExpectimaxAgent(Player):
         opp_pokemon = battle.opponent_active_pokemon.species if battle.opponent_active_pokemon else "?"
         our_hp = battle.active_pokemon.current_hp_fraction if battle.active_pokemon else 1.0
         opp_hp = battle.opponent_active_pokemon.current_hp_fraction if battle.opponent_active_pokemon else 1.0
-        self._battle_logger.start_turn(battle.turn, our_pokemon, opp_pokemon, our_hp, opp_hp)
+
+        # Detect what opponent did last turn
+        opp_last_move = None
+        opp_last_action = None
+        opp_prev_pokemon = None
+        if battle.opponent_active_pokemon:
+            last_move = getattr(battle.opponent_active_pokemon, "last_move", None)
+            if last_move:
+                opp_last_move = last_move.id if hasattr(last_move, "id") else str(last_move)
+                opp_last_action = "move"
+            # Detect if opponent switched (their pokemon changed since last turn)
+            if self._prev_opp_pokemon and self._prev_opp_pokemon != opp_pokemon:
+                opp_last_action = "switch"
+                opp_prev_pokemon = self._prev_opp_pokemon
+
+        self._battle_logger.start_turn(
+            battle.turn, our_pokemon, opp_pokemon, our_hp, opp_hp,
+            opp_last_move=opp_last_move,
+            opp_last_action=opp_last_action,
+            opp_prev_pokemon=opp_prev_pokemon,
+        )
+        self._prev_opp_pokemon = opp_pokemon
 
         if not battle.available_moves and battle.available_switches:
             chosen_switch = _best_forced_switch(battle, type_chart)
@@ -152,12 +174,6 @@ class ExpectimaxAgent(Player):
             score = self._eval_switch(switch, battle, type_chart)
             self._battle_logger.log_decision("switch", switch.species, score, our_hp, opp_hp, chosen=False)
 
-            # Avoid switching to a negative score when a move is available (prefer to stay in).
-            # Exception: if all moves are terrible, still allow bad switches as best-of-bad.
-            if score < 0.0 and best_move_score > float("-inf"):
-                # Keep track of the switch but don't prefer it over moves
-                continue
-
             if score > best_score:
                 best_score = score
                 best_order = self.create_order(switch)
@@ -186,6 +202,7 @@ class ExpectimaxAgent(Player):
             self._battle_logger.set_winner(winner)
             self._battle_logs.append(self._battle_logger.get_log())
             self._battle_logger = None
+            self._prev_opp_pokemon = None
 
     def save_battle_logs(self, filename: str):
         """Save all battle logs to a JSON file."""

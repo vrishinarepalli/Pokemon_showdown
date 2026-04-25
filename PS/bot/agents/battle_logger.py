@@ -31,6 +31,10 @@ class TurnLog:
     our_hp: float
     opp_hp: float
     decisions: List[Decision] = field(default_factory=list)
+    # What opponent did on the PREVIOUS turn (visible at start of this turn)
+    opp_last_move: Optional[str] = None
+    opp_last_action: Optional[str] = None  # "move" or "switch"
+    opp_prev_pokemon: Optional[str] = None  # Their pokemon last turn (if different)
 
 
 @dataclass
@@ -70,6 +74,9 @@ class BattleLog:
                     "opp_pokemon": t.opp_pokemon,
                     "our_hp": round(t.our_hp, 3),
                     "opp_hp": round(t.opp_hp, 3),
+                    "opp_last_move": t.opp_last_move,
+                    "opp_last_action": t.opp_last_action,
+                    "opp_prev_pokemon": t.opp_prev_pokemon,
                     "decisions": [
                         {
                             "type": d.action_type,
@@ -105,7 +112,10 @@ class BattleLogger:
         self.opp_team = opp_team
 
     def start_turn(self, turn: int, our_pokemon: str, opp_pokemon: str,
-                   our_hp: float, opp_hp: float):
+                   our_hp: float, opp_hp: float,
+                   opp_last_move: Optional[str] = None,
+                   opp_last_action: Optional[str] = None,
+                   opp_prev_pokemon: Optional[str] = None):
         """Mark the start of a new turn."""
         self.current_turn = TurnLog(
             turn=turn,
@@ -113,6 +123,9 @@ class BattleLogger:
             opp_pokemon=opp_pokemon,
             our_hp=our_hp,
             opp_hp=opp_hp,
+            opp_last_move=opp_last_move,
+            opp_last_action=opp_last_action,
+            opp_prev_pokemon=opp_prev_pokemon,
         )
 
     def log_decision(self, action_type: str, action_name: str, score: float,
