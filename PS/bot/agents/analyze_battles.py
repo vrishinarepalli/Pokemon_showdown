@@ -73,30 +73,62 @@ def analyze_logs(log_file: str = "./battle_logs.json", show_switches: bool = Tru
                     "outcome": log["winner"],
                 })
 
-    if show_switches and problematic_switches:
-        print(f"\nPROBLEMATIC SWITCHES ({overvalued_switches}/{total_switches} total switches):")
+    if show_switches:
+        # Show problematic switches
+        if problematic_switches:
+            print(f"\nPROBLEMATIC SWITCHES ({overvalued_switches}/{total_switches} total switches):")
+            print(f"{'='*70}\n")
+
+            # Group by outcome
+            by_outcome = defaultdict(list)
+            for ps in problematic_switches:
+                by_outcome[ps["outcome"]].append(ps)
+
+            for outcome in ["them", "us", None]:
+                switches = by_outcome.get(outcome, [])
+                if not switches:
+                    continue
+
+                outcome_name = "LOSSES" if outcome == "them" else "WINS" if outcome == "us" else "INCOMPLETE"
+                print(f"\n{outcome_name}: {len(switches)} questionable switches\n")
+
+                for ps in switches[:5]:  # Show first 5
+                    print(f"  Battle {ps['battle']} Turn {ps['turn']}:")
+                    print(f"    In:   {ps['our_pokemon']} (HP: {ps['our_hp']:.1%})")
+                    print(f"    Out:  {ps['opp_pokemon']} (HP: {ps['opp_hp']:.1%})")
+                    print(f"    -> Switched to {ps['switched_to']} (score: {ps['switch_score']:.3f})")
+                    print(f"    vs. Best move {ps['best_move']['name']} (score: {ps['best_move']['score']:.3f})")
+                    print()
+
+        # Show ALL decisions (moves and switches) for detailed analysis
+        print(f"\nDETAILED DECISION LOG (first 3 battles, first 8 turns):")
         print(f"{'='*70}\n")
 
-        # Group by outcome
-        by_outcome = defaultdict(list)
-        for ps in problematic_switches:
-            by_outcome[ps["outcome"]].append(ps)
+        for log in logs[:3]:  # Show first 3 battles
+            print(f"\nBattle {log['battle_id']} - Result: {('WIN' if log['winner']=='us' else 'LOSS' if log['winner']=='them' else '??')}:")
+            for turn in log["turns"][:8]:  # First 8 turns
+                print(f"\n  Turn {turn['turn']}: {turn['our_pokemon']} (HP {turn['our_hp']:.0%}) vs {turn['opp_pokemon']} (HP {turn['opp_hp']:.0%})")
 
-        for outcome in ["them", "us", None]:
-            switches = by_outcome.get(outcome, [])
-            if not switches:
-                continue
+                # Group decisions
+                moves = [d for d in turn["decisions"] if d["type"] == "move"]
+                switches = [d for d in turn["decisions"] if d["type"] == "switch"]
 
-            outcome_name = "LOSSES" if outcome == "them" else "WINS" if outcome == "us" else "INCOMPLETE"
-            print(f"\n{outcome_name}: {len(switches)} questionable switches\n")
+                # Show chosen decision
+                chosen = next((d for d in turn["decisions"] if d["chosen"]), None)
+                if chosen:
+                    print(f"    ✓ CHOSEN: {chosen['type'].upper()} {chosen['name']} (score: {chosen['score']:.3f})")
 
-            for ps in switches[:10]:  # Show first 10
-                print(f"  Battle {ps['battle']} Turn {ps['turn']}:")
-                print(f"    In:   {ps['our_pokemon']} (HP: {ps['our_hp']:.1%})")
-                print(f"    Out:  {ps['opp_pokemon']} (HP: {ps['opp_hp']:.1%})")
-                print(f"    -> Switched to {ps['switched_to']} (score: {ps['switch_score']:.3f})")
-                print(f"    vs. Best move {ps['best_move']['name']} (score: {ps['best_move']['score']:.3f})")
-                print()
+                # Show top moves
+                if moves:
+                    top_moves = sorted(moves, key=lambda x: x["score"], reverse=True)[:3]
+                    for m in top_moves:
+                        print(f"      Move: {m['name']:20} score: {m['score']:7.3f}")
+
+                # Show top switches
+                if switches:
+                    top_switches = sorted(switches, key=lambda x: x["score"], reverse=True)[:3]
+                    for s in top_switches:
+                        print(f"      Switch: {s['name']:20} score: {s['score']:7.3f}")
 
     # Analyze early game aggression
     print(f"\n{'='*70}")

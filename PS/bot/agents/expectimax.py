@@ -115,6 +115,7 @@ class ExpectimaxAgent(Player):
         best_order = None
         best_score = float("-inf")
         chosen_action = None
+        best_move_score = float("-inf")
 
         for move in battle.available_moves:
             if (move.current_pp or 0) == 0:
@@ -138,6 +139,7 @@ class ExpectimaxAgent(Player):
                 score = self._eval_move(move, battle, type_chart)
 
             self._battle_logger.log_decision("move", move.id, score, our_hp, opp_hp, chosen=False)
+            best_move_score = max(best_move_score, score)
 
             if score > best_score:
                 best_score = score
@@ -149,6 +151,12 @@ class ExpectimaxAgent(Player):
         for switch in battle.available_switches:
             score = self._eval_switch(switch, battle, type_chart)
             self._battle_logger.log_decision("switch", switch.species, score, our_hp, opp_hp, chosen=False)
+
+            # Avoid switching to a negative score when a move is available (prefer to stay in).
+            # Exception: if all moves are terrible, still allow bad switches as best-of-bad.
+            if score < 0.0 and best_move_score > float("-inf"):
+                # Keep track of the switch but don't prefer it over moves
+                continue
 
             if score > best_score:
                 best_score = score
