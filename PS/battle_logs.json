@@ -1,0 +1,4298 @@
+[
+  {
+    "battle_id": "battle-gen9randombattle-1",
+    "timestamp": "2026-04-25T17:35:11.988104",
+    "our_name": "ExpecM4",
+    "opp_name": "HeurM4",
+    "our_team": {
+      "illumise": {
+        "level": 91,
+        "current_hp": 1.0
+      },
+      "gougingfire": {
+        "level": 74,
+        "current_hp": 0.37545126353790614
+      },
+      "toedscruel": {
+        "level": 87,
+        "current_hp": 1.0
+      },
+      "greninja": {
+        "level": 80,
+        "current_hp": 1.0
+      },
+      "wyrdeer": {
+        "level": 87,
+        "current_hp": 1.0
+      },
+      "duraludon": {
+        "level": 82,
+        "current_hp": 1.0
+      }
+    },
+    "opp_team": {
+      "golduck": {
+        "level": 90
+      }
+    },
+    "winner": "them",
+    "turns": [
+      {
+        "turn": 0,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "?",
+        "our_hp": 1.0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": 0.15,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "wyrdeer",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": 0.15,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "our_pokemon": "gougingfire",
+        "opp_pokemon": "golduck",
+        "our_hp": 0.375,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "outrage",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "heatcrash",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "morningsun",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.1717,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.0533,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": -0.075,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "wyrdeer",
+            "score": -0.1356,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.1023,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 2,
+        "our_pokemon": "toedscruel",
+        "opp_pokemon": "golduck",
+        "our_hp": 0.324,
+        "opp_hp": 0.9,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "rapidspin",
+            "score": -0.8884,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "earthpower",
+            "score": -0.6666,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "toxic",
+            "score": -0.5752,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "gigadrain",
+            "score": -0.4348,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.0696,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": 0.0179,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "wyrdeer",
+            "score": -0.0531,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.0225,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 3,
+        "our_pokemon": "greninja",
+        "opp_pokemon": "golduck",
+        "our_hp": 0.541,
+        "opp_hp": 0.8,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "hydropump",
+            "score": -0.3179,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "darkpulse",
+            "score": -0.1747,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "gunkshot",
+            "score": -0.2519,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "toxicspikes",
+            "score": -0.291,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": 0.0304,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.8,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.4886,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "wyrdeer",
+            "score": 0.0469,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": 0.0775,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 4,
+        "our_pokemon": "duraludon",
+        "opp_pokemon": "golduck",
+        "our_hp": 0.586,
+        "opp_hp": 0.7,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "flashcannon",
+            "score": -0.2352,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "dracometeor",
+            "score": 0.1158,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": -0.2536,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "irondefense",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": 0.1304,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.7,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.3886,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "wyrdeer",
+            "score": 0.1469,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": -0.241,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 5,
+        "our_pokemon": "wyrdeer",
+        "opp_pokemon": "golduck",
+        "our_hp": 1.0,
+        "opp_hp": 0.6,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "bodyslam",
+            "score": 0.6482,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "earthquake",
+            "score": 0.5605,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": 0.3819,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "psychicnoise",
+            "score": 0.5969,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": 0.2304,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.6,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.45,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.321,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": -0.141,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 6,
+        "our_pokemon": "wyrdeer",
+        "opp_pokemon": "ariados",
+        "our_hp": 1.0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "bodyslam",
+            "score": -0.3095,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "earthquake",
+            "score": -0.4005,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.5185,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "psychicnoise",
+            "score": 0.0111,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.1948,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.5517,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 7,
+        "our_pokemon": "wyrdeer",
+        "opp_pokemon": "registeel",
+        "our_hp": 1.0,
+        "opp_hp": 0.93,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "bodyslam",
+            "score": 0.1539,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "earthquake",
+            "score": 0.4696,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": 0.0769,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "psychicnoise",
+            "score": 0.137,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.0126,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.4218,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.6174,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.2346,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": -0.2769,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 8,
+        "our_pokemon": "wyrdeer",
+        "opp_pokemon": "ariados",
+        "our_hp": 1.0,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "bodyslam",
+            "score": 0.5081,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "earthquake",
+            "score": 0.5081,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "psychicnoise",
+            "score": 0.5081,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": 1.0,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": 0.6483,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": 0.2,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 9,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "electrode",
+        "our_hp": 0.297,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": 0.09,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": 0.09,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "wyrdeer",
+            "score": 1.0485,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": 0.35,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": 0.7712,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": 0.2,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 10,
+        "our_pokemon": "wyrdeer",
+        "opp_pokemon": "golduck",
+        "our_hp": 0.486,
+        "opp_hp": 0.6,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "bodyslam",
+            "score": -0.0263,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "earthquake",
+            "score": -0.1141,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.2013,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "psychicnoise",
+            "score": -0.0776,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.6,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.6,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.45,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.321,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": -0.141,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "our_pokemon": "wyrdeer",
+        "opp_pokemon": "golduck",
+        "our_hp": 0,
+        "opp_hp": 0.5,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "greninja",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "our_pokemon": "greninja",
+        "opp_pokemon": "golduck",
+        "our_hp": 0.541,
+        "opp_hp": 0.4,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "hydropump",
+            "score": 0.1712,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "darkpulse",
+            "score": 0.3144,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "gunkshot",
+            "score": 0.2373,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "toxicspikes",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.4,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.4,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.25,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.121,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 12,
+        "our_pokemon": "greninja",
+        "opp_pokemon": "golduck",
+        "our_hp": 0,
+        "opp_hp": 0.4,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 12,
+        "our_pokemon": "duraludon",
+        "opp_pokemon": "golduck",
+        "our_hp": 0.586,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "flashcannon",
+            "score": 0.3902,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "dracometeor",
+            "score": 0.3902,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": 0.3902,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "irondefense",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": 0.35,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 13,
+        "our_pokemon": "duraludon",
+        "opp_pokemon": "pachirisu",
+        "our_hp": 0.458,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "flashcannon",
+            "score": -0.3867,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "dracometeor",
+            "score": -0.0634,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": -0.3766,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "irondefense",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.8349,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.5644,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.3042,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 14,
+        "our_pokemon": "duraludon",
+        "opp_pokemon": "pachirisu",
+        "our_hp": 0.458,
+        "opp_hp": 0.84,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "flashcannon",
+            "score": -0.2267,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "dracometeor",
+            "score": 0.0966,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": -0.2166,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "irondefense",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.6443,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.4044,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.1442,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 15,
+        "our_pokemon": "duraludon",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.096,
+        "opp_hp": 0.81,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "flashcannon",
+            "score": -0.7372,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "dracometeor",
+            "score": -0.7068,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": -0.5602,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "irondefense",
+            "score": -0.81,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.6498,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.3768,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.4974,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 16,
+        "our_pokemon": "gougingfire",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.123,
+        "opp_hp": 0.77,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "outrage",
+            "score": -0.6048,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": -0.77,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "heatcrash",
+            "score": -0.77,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "morningsun",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": -0.3746,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.67,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "toedscruel",
+            "score": -0.3296,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 17,
+        "our_pokemon": "toedscruel",
+        "opp_pokemon": "registeel",
+        "our_hp": 0,
+        "opp_hp": 0.83,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "illumise",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 17,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.297,
+        "opp_hp": 0.89,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.4946,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.1827,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.3627,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.4226,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.79,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.89,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 18,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.545,
+        "opp_hp": 0.89,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.1913,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.2689,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.0594,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.1193,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.79,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.89,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 19,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.741,
+        "opp_hp": 0.95,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.2479,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.1323,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.1159,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.1759,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.85,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.95,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 20,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.759,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.2778,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.0837,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.1458,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.2058,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 21,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.726,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.316,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.0806,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.184,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.244,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 22,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.752,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.2857,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.0832,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.1538,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.2137,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 23,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.726,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.316,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.0806,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.184,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.244,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 24,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.763,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.2738,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": -0.0161,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.1419,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.2018,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 25,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.737,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.3022,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.1702,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.2302,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 26,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.496,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.5963,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.4643,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -0.5243,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 27,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.214,
+        "opp_hp": 0.94,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "encore",
+            "score": -0.94,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bugbuzz",
+            "score": -0.8081,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "thunderwave",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.84,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": -0.94,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 28,
+        "our_pokemon": "illumise",
+        "opp_pokemon": "registeel",
+        "our_hp": 0,
+        "opp_hp": 0.89,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "gougingfire",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 28,
+        "our_pokemon": "gougingfire",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.123,
+        "opp_hp": 0.83,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "outrage",
+            "score": -0.6648,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": -0.83,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "heatcrash",
+            "score": -0.83,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "morningsun",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": -0.73,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 29,
+        "our_pokemon": "gougingfire",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.011,
+        "opp_hp": 0.83,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "outrage",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 30,
+        "our_pokemon": "gougingfire",
+        "opp_pokemon": "registeel",
+        "our_hp": 0,
+        "opp_hp": 0.75,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "duraludon",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 30,
+        "our_pokemon": "duraludon",
+        "opp_pokemon": "registeel",
+        "our_hp": 0.096,
+        "opp_hp": 0.65,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "flashcannon",
+            "score": -0.5102,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "dracometeor",
+            "score": -0.4487,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": -0.4002,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "irondefense",
+            "score": -0.65,
+            "chosen": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "battle_id": "battle-gen9randombattle-2",
+    "timestamp": "2026-04-25T17:35:12.209773",
+    "our_name": "ExpecM4",
+    "opp_name": "HeurM4",
+    "our_team": {
+      "zangoose": {
+        "level": 85,
+        "current_hp": 1.0
+      },
+      "ambipom": {
+        "level": 84,
+        "current_hp": 0.44106463878326996
+      },
+      "tyranitar": {
+        "level": 79,
+        "current_hp": 1.0
+      },
+      "seviper": {
+        "level": 93,
+        "current_hp": 1.0
+      },
+      "blaziken": {
+        "level": 76,
+        "current_hp": 1.0
+      },
+      "hariyama": {
+        "level": 87,
+        "current_hp": 1.0
+      }
+    },
+    "opp_team": {
+      "donphan": {
+        "level": 84
+      }
+    },
+    "winner": "them",
+    "turns": [
+      {
+        "turn": 0,
+        "our_pokemon": "zangoose",
+        "opp_pokemon": "?",
+        "our_hp": 1.0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "swordsdance",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "facade",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": 0.15,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": 0.15,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "our_pokemon": "ambipom",
+        "opp_pokemon": "donphan",
+        "our_hp": 0.441,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "lowkick",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "doubleedge",
+            "score": -0.8801,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -1.1292,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "tripleaxel",
+            "score": -1.1856,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.2992,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": -0.4419,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -0.7626,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.1296,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 2,
+        "our_pokemon": "hariyama",
+        "opp_pokemon": "donphan",
+        "our_hp": 0.599,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "heavyslam",
+            "score": -0.8674,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": -0.3805,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.6884,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "headlongrush",
+            "score": -0.5428,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.4634,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": -0.588,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.9,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 3,
+        "our_pokemon": "hariyama",
+        "opp_pokemon": "donphan",
+        "our_hp": 0.038,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "heavyslam",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "headlongrush",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.4634,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": -0.588,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.9,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 4,
+        "our_pokemon": "zangoose",
+        "opp_pokemon": "donphan",
+        "our_hp": 1.0,
+        "opp_hp": 0.61,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": 0.1094,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.0248,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "swordsdance",
+            "score": -0.0175,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "facade",
+            "score": 0.0763,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.61,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": -0.198,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -0.61,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -0.61,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.51,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 5,
+        "our_pokemon": "zangoose",
+        "opp_pokemon": "azelf",
+        "our_hp": 0.209,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": -1.22,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -1.22,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "swordsdance",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "facade",
+            "score": -1.22,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": 0.25,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -0.6464,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.9,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 6,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "azelf",
+        "our_hp": 1.0,
+        "opp_hp": 0.55,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 1.0,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.45,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.45,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -0.45,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -0.45,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.45,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 7,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "azelf",
+        "our_hp": 1.0,
+        "opp_hp": 0.49,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 1.0,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.39,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.39,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -0.39,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -0.39,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.39,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 8,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "azelf",
+        "our_hp": 1.0,
+        "opp_hp": 0.43,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 1.0,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.33,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 9,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "donphan",
+        "our_hp": 0.271,
+        "opp_hp": 0.61,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": -0.61,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stoneedge",
+            "score": -0.538,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.3518,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "icepunch",
+            "score": 0.5694,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.61,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.61,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": -0.61,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -0.61,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.51,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 10,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "donphan",
+        "our_hp": 0.333,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stoneedge",
+            "score": 0.6707,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": 0.6707,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "icepunch",
+            "score": 0.6707,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": 0.3,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "seviper",
+        "our_hp": 0.396,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 0.5936,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": 0.3,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "seviper",
+            "score": 1.1,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": 0.8156,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": 0.2,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 12,
+        "our_pokemon": "seviper",
+        "opp_pokemon": "zekrom",
+        "our_hp": 0.422,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.7057,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "switcheroo",
+            "score": -0.9352,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "earthquake",
+            "score": -0.2373,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "gunkshot",
+            "score": -0.4345,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": -0.6645,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": -0.2603,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.9,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 13,
+        "our_pokemon": "seviper",
+        "opp_pokemon": "zekrom",
+        "our_hp": 0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "blaziken",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 13,
+        "our_pokemon": "blaziken",
+        "opp_pokemon": "zekrom",
+        "our_hp": 1.0,
+        "opp_hp": 0.47,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "swordsdance",
+            "score": -0.47,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "flareblitz",
+            "score": 0.1537,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": 0.5779,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": 0.089,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.37,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.47,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": -0.37,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.37,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 14,
+        "our_pokemon": "blaziken",
+        "opp_pokemon": "zekrom",
+        "our_hp": 0.219,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "swordsdance",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "flareblitz",
+            "score": 0.5509,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": 0.5509,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": 0.5509,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": 0.3,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": 0.3,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": 0.3,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 15,
+        "our_pokemon": "blaziken",
+        "opp_pokemon": "azelf",
+        "our_hp": 0,
+        "opp_hp": 0.43,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 15,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "azelf",
+        "our_hp": 0.396,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 0.8338,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": 0.3,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": 0.3,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": 0.3,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 16,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "banette",
+        "our_hp": 0.128,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stoneedge",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "icepunch",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.4944,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ambipom",
+            "score": -0.2109,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 17,
+        "our_pokemon": "ambipom",
+        "opp_pokemon": "banette",
+        "our_hp": 0.38,
+        "opp_hp": 0.85,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "lowkick",
+            "score": -0.2353,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "doubleedge",
+            "score": -0.2353,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": 0.2051,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "tripleaxel",
+            "score": -0.1697,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.75,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.3444,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": -0.7,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 18,
+        "our_pokemon": "ambipom",
+        "opp_pokemon": "banette",
+        "our_hp": 0.319,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": 0.7404,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": 0.3,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": 0.7056,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": 0.35,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 19,
+        "our_pokemon": "ambipom",
+        "opp_pokemon": "ampharos",
+        "our_hp": 0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 19,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "ampharos",
+        "our_hp": 0.128,
+        "opp_hp": 0.63,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": -0.63,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stoneedge",
+            "score": -0.63,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.63,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "icepunch",
+            "score": -0.63,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "hariyama",
+            "score": -0.53,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.63,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 20,
+        "our_pokemon": "hariyama",
+        "opp_pokemon": "ampharos",
+        "our_hp": 0,
+        "opp_hp": 0.63,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "tyranitar",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 20,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "ampharos",
+        "our_hp": 0.128,
+        "opp_hp": 0.63,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": -0.63,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "stoneedge",
+            "score": -0.63,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.63,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "icepunch",
+            "score": -0.63,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": -0.63,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 21,
+        "our_pokemon": "tyranitar",
+        "opp_pokemon": "ampharos",
+        "our_hp": 0,
+        "opp_hp": 0.63,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "zangoose",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 21,
+        "our_pokemon": "zangoose",
+        "opp_pokemon": "ampharos",
+        "our_hp": 0.209,
+        "opp_hp": 0.57,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": -0.2143,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.3743,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "swordsdance",
+            "score": -0.57,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "facade",
+            "score": -0.2547,
+            "chosen": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "battle_id": "battle-gen9randombattle-3",
+    "timestamp": "2026-04-25T17:35:12.357461",
+    "our_name": "ExpecM4",
+    "opp_name": "HeurM4",
+    "our_team": {
+      "corviknight": {
+        "level": 80,
+        "current_hp": 1.0
+      },
+      "salamence": {
+        "level": 77,
+        "current_hp": 0.15384615384615385
+      },
+      "ariados": {
+        "level": 95,
+        "current_hp": 1.0
+      },
+      "jolteon": {
+        "level": 84,
+        "current_hp": 1.0
+      },
+      "ursaluna": {
+        "level": 79,
+        "current_hp": 1.0
+      },
+      "pawmot": {
+        "level": 80,
+        "current_hp": 1.0
+      }
+    },
+    "opp_team": {
+      "toxtricity": {
+        "level": 82
+      }
+    },
+    "winner": "them",
+    "turns": [
+      {
+        "turn": 0,
+        "our_pokemon": "corviknight",
+        "opp_pokemon": "?",
+        "our_hp": 1.0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "defog",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bravebird",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": 0.15,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": 0.15,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": 0.15,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "our_pokemon": "salamence",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 0.154,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "earthquake",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "outrage",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "dualwingbeat",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "corviknight",
+            "score": -0.5647,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.1392,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": -0.295,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": 0.245,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.3351,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 2,
+        "our_pokemon": "ursaluna",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 0.325,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "swordsdance",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "facade",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "trailblaze",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "headlongrush",
+            "score": -1.275,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "corviknight",
+            "score": -0.0484,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.1849,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": -0.2042,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.4455,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 3,
+        "our_pokemon": "corviknight",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 1.0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "defog",
+            "score": -0.0484,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": 0.0763,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bravebird",
+            "score": 0.2294,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.85,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.1849,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": -0.2042,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.4455,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 4,
+        "our_pokemon": "corviknight",
+        "opp_pokemon": "terrakion",
+        "our_hp": 0.222,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "defog",
+            "score": -1.22,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": -1.22,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bravebird",
+            "score": -1.22,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.85,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.5679,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": -0.3122,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.2041,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 5,
+        "our_pokemon": "pawmot",
+        "opp_pokemon": "terrakion",
+        "our_hp": 0.053,
+        "opp_hp": 0.13,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "nuzzle",
+            "score": -0.35,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "doubleshock",
+            "score": -0.35,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "revivalblessing",
+            "score": -0.35,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": -0.35,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": 0.02,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": 0.9497,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": 0.223,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.03,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "corviknight",
+            "score": -0.03,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 6,
+        "our_pokemon": "ariados",
+        "opp_pokemon": "terrakion",
+        "our_hp": 0.822,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "poisonjab",
+            "score": 1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "megahorn",
+            "score": 1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": 1.0,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stickyweb",
+            "score": 1.05,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": 0.35,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": 0.35,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": 0.553,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": 0.3,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "corviknight",
+            "score": 0.3,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 7,
+        "our_pokemon": "ariados",
+        "opp_pokemon": "groudon",
+        "our_hp": 0.328,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "poisonjab",
+            "score": -1.165,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "megahorn",
+            "score": -1.165,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -1.165,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stickyweb",
+            "score": -0.95,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.587,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "corviknight",
+            "score": -0.5034,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 8,
+        "our_pokemon": "corviknight",
+        "opp_pokemon": "groudon",
+        "our_hp": 0.222,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "defog",
+            "score": -0.6767,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": -0.5123,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bravebird",
+            "score": -0.3125,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.1235,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.587,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 9,
+        "our_pokemon": "corviknight",
+        "opp_pokemon": "groudon",
+        "our_hp": 0.722,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "defog",
+            "score": -0.0765,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": 0.0879,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bravebird",
+            "score": 0.2877,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.1111,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.587,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 10,
+        "our_pokemon": "corviknight",
+        "opp_pokemon": "groudon",
+        "our_hp": 0.649,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "defog",
+            "score": -0.122,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bodypress",
+            "score": 0.0425,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "bravebird",
+            "score": 0.2423,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "roost",
+            "score": 0.1403,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.9,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.587,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "our_pokemon": "corviknight",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 0,
+        "opp_hp": 0.75,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "jolteon",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "our_pokemon": "jolteon",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 1.0,
+        "opp_hp": 0.48,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "thunderbolt",
+            "score": 0.5895,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "terablast",
+            "score": 0.6413,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "substitute",
+            "score": 0.3147,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "calmmind",
+            "score": 0.9958,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.48,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.38,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.48,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 12,
+        "our_pokemon": "jolteon",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 1.0,
+        "opp_hp": 0.48,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "thunderbolt",
+            "score": 0.5895,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "terablast",
+            "score": 0.6413,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "substitute",
+            "score": 0.3147,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "calmmind",
+            "score": 0.9958,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.48,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.38,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.48,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 13,
+        "our_pokemon": "jolteon",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 1.0,
+        "opp_hp": 0.48,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "thunderbolt",
+            "score": 0.7234,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "terablast",
+            "score": 1.0,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "substitute",
+            "score": 0.3147,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "calmmind",
+            "score": 0.9958,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.48,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": -0.38,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.48,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 14,
+        "our_pokemon": "jolteon",
+        "opp_pokemon": "groudon",
+        "our_hp": 0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "salamence",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 14,
+        "our_pokemon": "salamence",
+        "opp_pokemon": "groudon",
+        "our_hp": 0.154,
+        "opp_hp": 0.56,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 0.538,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.46,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.56,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.56,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 15,
+        "our_pokemon": "salamence",
+        "opp_pokemon": "groudon",
+        "our_hp": 0.154,
+        "opp_hp": 0.56,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 0.538,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.2019,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.56,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.3897,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 16,
+        "our_pokemon": "salamence",
+        "opp_pokemon": "groudon",
+        "our_hp": 0.154,
+        "opp_hp": 0.62,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "dragondance",
+            "score": 0.538,
+            "chosen": true
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -0.2619,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.62,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": -0.4497,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 17,
+        "our_pokemon": "salamence",
+        "opp_pokemon": "granbull",
+        "our_hp": 0,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "ariados",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 17,
+        "our_pokemon": "ariados",
+        "opp_pokemon": "granbull",
+        "our_hp": 0.328,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "poisonjab",
+            "score": -0.0076,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "megahorn",
+            "score": -0.5587,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.7037,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stickyweb",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 18,
+        "our_pokemon": "ariados",
+        "opp_pokemon": "granbull",
+        "our_hp": 0.328,
+        "opp_hp": 1.0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "poisonjab",
+            "score": -0.0076,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "megahorn",
+            "score": -0.5587,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": -0.7037,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stickyweb",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": -1.0,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -1.0,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 19,
+        "our_pokemon": "ariados",
+        "opp_pokemon": "granbull",
+        "our_hp": 0.328,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "poisonjab",
+            "score": 0.7058,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "megahorn",
+            "score": 0.7058,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "knockoff",
+            "score": 0.7058,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "stickyweb",
+            "score": -Infinity,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": 0.2,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": 0.2,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 20,
+        "our_pokemon": "ariados",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 0,
+        "opp_hp": 0.48,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "ursaluna",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 20,
+        "our_pokemon": "ursaluna",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 0.325,
+        "opp_hp": 0.22,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "swordsdance",
+            "score": -0.22,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "facade",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "trailblaze",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "headlongrush",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": -0.22,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 21,
+        "our_pokemon": "ursaluna",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 0,
+        "opp_hp": 0.22,
+        "decisions": [
+          {
+            "type": "switch",
+            "name": "pawmot",
+            "score": 0.0,
+            "chosen": true
+          }
+        ]
+      },
+      {
+        "turn": 21,
+        "our_pokemon": "pawmot",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 0.053,
+        "opp_hp": 0.22,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "nuzzle",
+            "score": -0.2678,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "doubleshock",
+            "score": 0.3161,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "revivalblessing",
+            "score": -0.33,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": 0.3161,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 22,
+        "our_pokemon": "pawmot",
+        "opp_pokemon": "toxtricity",
+        "our_hp": 0.053,
+        "opp_hp": 0,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "nuzzle",
+            "score": 0.3161,
+            "chosen": true
+          },
+          {
+            "type": "move",
+            "name": "doubleshock",
+            "score": 0.3161,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "revivalblessing",
+            "score": 0.3161,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": 0.3161,
+            "chosen": false
+          }
+        ]
+      },
+      {
+        "turn": 23,
+        "our_pokemon": "pawmot",
+        "opp_pokemon": "groudon",
+        "our_hp": 0.053,
+        "opp_hp": 0.62,
+        "decisions": [
+          {
+            "type": "move",
+            "name": "nuzzle",
+            "score": -0.73,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "doubleshock",
+            "score": -0.73,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "revivalblessing",
+            "score": -0.73,
+            "chosen": false
+          },
+          {
+            "type": "move",
+            "name": "closecombat",
+            "score": -0.2799,
+            "chosen": true
+          }
+        ]
+      }
+    ]
+  }
+]

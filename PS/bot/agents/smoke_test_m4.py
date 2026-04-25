@@ -28,7 +28,7 @@ BATTLE_FORMAT = "gen9randombattle"
 DEFAULT_BATTLES = 20
 
 
-async def run(n_battles: int, save_replays: bool = False) -> None:
+async def run(n_battles: int, save_replays: bool = False, save_logs: bool = True) -> None:
     replay_dir = "./replays" if save_replays else None
     expectimax = ExpectimaxAgent(
         account_configuration=AccountConfiguration("ExpecM4", None),
@@ -47,7 +47,19 @@ async def run(n_battles: int, save_replays: bool = False) -> None:
     last_count = 0
 
     for _ in range(n_battles):
+        battles_before = len(expectimax._battle_logs)
+
         await expectimax.battle_against(heuristic, n_battles=1)
+
+        # Finalize any newly completed battles that don't have logs yet
+        for battle_tag, battle in expectimax.battles.items():
+            if not battle.finished:
+                continue
+            # Check if we already logged this battle
+            if any(log.battle_id == battle_tag for log in expectimax._battle_logs):
+                continue
+            expectimax.finalize_battle_log(battle)
+
         current_count = expectimax.n_finished_battles
         wins = expectimax.n_won_battles
         winrate = (wins / current_count * 100) if current_count else 0.0
@@ -66,6 +78,18 @@ async def run(n_battles: int, save_replays: bool = False) -> None:
     if total >= 100 and winrate < 60.0:
         print("WARNING: below M4 acceptance threshold (>=60%).")
 
+    # Save battle logs for analysis
+    if save_logs:
+        log_file = "./battle_logs.json"
+        expectimax.save_battle_logs(log_file)
+        print(f"\nBattle logs saved to {log_file}")
+
+        # Print summary of problematic switches
+        from bot.agents.battle_logger import BattleLogCollector
+        collector = BattleLogCollector()
+        for log in expectimax.get_battle_logs():
+            collector.add_log(log)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="M4 expectimax smoke test")
@@ -80,8 +104,13 @@ def main() -> None:
         action="store_true",
         help="save battle replays to ./replays/ (HTML files, show both teams)",
     )
+    parser.add_argument(
+        "--no-logs",
+        action="store_true",
+        help="disable battle log collection and saving",
+    )
     args = parser.parse_args()
-    asyncio.run(run(args.n_battles, save_replays=args.save_replays))
+    asyncio.run(run(args.n_battles, save_replays=args.save_replays, save_logs=not args.no_logs))
 
 
 if __name__ == "__main__":

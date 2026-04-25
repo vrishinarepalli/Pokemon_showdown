@@ -15,6 +15,7 @@ from poke_env.data import GenData
 from poke_env.player import Player
 
 from bot.agents.debug import announce_team
+from bot.agents.battle_logger import BattleLogger
 from bot.value.handcrafted import HandcraftedValue
 
 
@@ -58,24 +59,62 @@ class ExpectimaxAgent(Player):
         super().__init__(*args, **kwargs)
         self._value = HandcraftedValue()
         self._opp_power_cache = {}  # (opp_id, our_id, gen) → power
+        self._battle_logger = None  # Created per battle
+        self._battle_logs = []  # All completed battle logs
 
     def choose_move(self, battle):
         announce_team(self, battle)
         type_chart = GenData.from_gen(battle.gen).type_chart
         self._opp_power_cache.clear()  # Fresh cache per turn
 
+        # Initialize logger on first turn of each battle
+        if self._battle_logger is None:
+            self._battle_logger = BattleLogger(
+                battle_id=battle.battle_tag,
+                our_name=self.username,
+                opp_name=battle.opponent_username,
+            )
+
+        # Record teams on first turn
+        if battle.turn == 1:
+            our_team = {
+                p.species: {"level": p.level, "current_hp": p.current_hp_fraction}
+                for p in battle.team.values() if p
+            }
+            opp_team = {
+                p.species: {"level": p.level}
+                for p in battle.opponent_team.values() if p
+            }
+            self._battle_logger.set_teams(our_team, opp_team)
+
+        # Start turn logging
+        our_pokemon = battle.active_pokemon.species if battle.active_pokemon else "?"
+        opp_pokemon = battle.opponent_active_pokemon.species if battle.opponent_active_pokemon else "?"
+        our_hp = battle.active_pokemon.current_hp_fraction if battle.active_pokemon else 1.0
+        opp_hp = battle.opponent_active_pokemon.current_hp_fraction if battle.opponent_active_pokemon else 1.0
+        self._battle_logger.start_turn(battle.turn, our_pokemon, opp_pokemon, our_hp, opp_hp)
+
         if not battle.available_moves and battle.available_switches:
-            return self.create_order(_best_forced_switch(battle, type_chart))
+            chosen_switch = _best_forced_switch(battle, type_chart)
+            order = self.create_order(chosen_switch)
+            self._battle_logger.log_decision("switch", chosen_switch.species, 0.0, our_hp, opp_hp, chosen=True)
+            self._battle_logger.end_turn()
+            return order
 
         # Forced pseudo-moves (Recharge, Struggle, Outrage lock-in, Choice lock):
         # if the engine gives us exactly one option and no switches, there's no
         # decision to make — avoid evaluating the move since its data may be
         # incomplete (e.g. Recharge has no priority field).
         if len(battle.available_moves) == 1 and not battle.available_switches:
-            return self.create_order(battle.available_moves[0])
+            move = battle.available_moves[0]
+            order = self.create_order(move)
+            self._battle_logger.log_decision("move", move.id, 0.0, our_hp, opp_hp, chosen=True)
+            self._battle_logger.end_turn()
+            return order
 
         best_order = None
         best_score = float("-inf")
+        chosen_action = None
 
         for move in battle.available_moves:
             if (move.current_pp or 0) == 0:
@@ -98,19 +137,59 @@ class ExpectimaxAgent(Player):
             else:
                 score = self._eval_move(move, battle, type_chart)
 
+            self._battle_logger.log_decision("move", move.id, score, our_hp, opp_hp, chosen=False)
+
             if score > best_score:
                 best_score = score
                 best_order = self.create_order(move)
+                chosen_action = ("move", move.id)
                 if is_setup and score > 0.5:
                     break
 
         for switch in battle.available_switches:
             score = self._eval_switch(switch, battle, type_chart)
+            self._battle_logger.log_decision("switch", switch.species, score, our_hp, opp_hp, chosen=False)
+
             if score > best_score:
                 best_score = score
                 best_order = self.create_order(switch)
+                chosen_action = ("switch", switch.species)
 
+        # Mark chosen action
+        if chosen_action:
+            for decision in self._battle_logger.current_turn.decisions:
+                if decision.action_name == chosen_action[1]:
+                    decision.chosen = True
+                    break
+
+        self._battle_logger.end_turn()
         return best_order if best_order is not None else self.choose_random_move(battle)
+
+    def finalize_battle_log(self, battle):
+        """Call after a battle ends to save the outcome to the log."""
+        if self._battle_logger is not None:
+            # Determine winner from battle state
+            if battle.won:
+                winner = "us"
+            elif battle.lost:
+                winner = "them"
+            else:
+                winner = None
+            self._battle_logger.set_winner(winner)
+            self._battle_logs.append(self._battle_logger.get_log())
+            self._battle_logger = None
+
+    def save_battle_logs(self, filename: str):
+        """Save all battle logs to a JSON file."""
+        from bot.agents.battle_logger import BattleLogCollector
+        collector = BattleLogCollector()
+        for log in self._battle_logs:
+            collector.add_log(log)
+        collector.save_to_file(filename)
+
+    def get_battle_logs(self):
+        """Get all battle logs."""
+        return self._battle_logs
 
     def _eval_move(self, move, battle, type_chart) -> float:
         attacker = battle.active_pokemon
