@@ -176,6 +176,72 @@ def analyze_logs(log_file: str = "./battle_logs.json", show_switches: bool = Tru
             print(f"  - {species.capitalize()} (L{info['level']})")
 
 
+def analyze_single_battle(battle_id: Optional[str] = None, log_file: str = "./battle_logs.json"):
+    """Show every turn of a single battle, end-to-end.
+
+    If battle_id is None, picks the longest LOSS (most decision points to learn from).
+    """
+    with open(log_file) as f:
+        logs = json.load(f)
+
+    if battle_id:
+        target = next((l for l in logs if l["battle_id"] == battle_id), None)
+        if target is None:
+            print(f"Battle {battle_id} not found")
+            return
+    else:
+        # Pick longest loss
+        losses = [l for l in logs if l["winner"] == "them"]
+        if not losses:
+            print("No losses to analyze")
+            return
+        target = max(losses, key=lambda l: len(l["turns"]))
+
+    print(f"\n{'='*70}")
+    print(f"BATTLE: {target['battle_id']}")
+    result = "WIN" if target["winner"] == "us" else "LOSS" if target["winner"] == "them" else "??"
+    print(f"RESULT: {result} ({len(target['turns'])} turns)")
+    print(f"{'='*70}\n")
+
+    print("OUR TEAM:")
+    for species, info in target["our_team"].items():
+        print(f"  - {species.capitalize()} (L{info['level']})")
+    print("\nOPP TEAM (revealed by end):")
+    for species, info in target["opp_team"].items():
+        print(f"  - {species.capitalize()} (L{info['level']})")
+    print()
+
+    for turn in target["turns"]:
+        print(f"\n{'─'*70}")
+        print(f"Turn {turn['turn']}: {turn['our_pokemon']} (HP {turn['our_hp']:.0%}) vs {turn['opp_pokemon']} (HP {turn['opp_hp']:.0%})")
+
+        opp_last_action = turn.get("opp_last_action")
+        opp_last_move = turn.get("opp_last_move")
+        opp_prev_pokemon = turn.get("opp_prev_pokemon")
+        if opp_last_action == "switch" and opp_prev_pokemon:
+            print(f"  [Opp last turn: SWITCHED from {opp_prev_pokemon} to {turn['opp_pokemon']}]")
+        elif opp_last_move:
+            print(f"  [Opp last turn: used {opp_last_move}]")
+
+        chosen = next((d for d in turn["decisions"] if d["chosen"]), None)
+        if chosen:
+            print(f"  ✓ CHOSEN: {chosen['type'].upper()} {chosen['name']} (score: {chosen['score']:.3f})")
+
+        moves = sorted([d for d in turn["decisions"] if d["type"] == "move"], key=lambda x: -x["score"])
+        switches = sorted([d for d in turn["decisions"] if d["type"] == "switch"], key=lambda x: -x["score"])
+
+        for m in moves:
+            marker = " <- CHOSEN" if m["chosen"] else ""
+            print(f"    Move:   {m['name']:22} {m['score']:7.3f}{marker}")
+        for s in switches:
+            marker = " <- CHOSEN" if s["chosen"] else ""
+            print(f"    Switch: {s['name']:22} {s['score']:7.3f}{marker}")
+
+
 if __name__ == "__main__":
-    log_file = sys.argv[1] if len(sys.argv) > 1 else "./battle_logs.json"
-    analyze_logs(log_file)
+    if len(sys.argv) > 1 and sys.argv[1] == "--single":
+        battle_id = sys.argv[2] if len(sys.argv) > 2 else None
+        analyze_single_battle(battle_id)
+    else:
+        log_file = sys.argv[1] if len(sys.argv) > 1 else "./battle_logs.json"
+        analyze_logs(log_file)

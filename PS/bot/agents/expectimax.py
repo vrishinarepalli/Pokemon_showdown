@@ -238,6 +238,10 @@ class ExpectimaxAgent(Player):
             our_after = max(0.0, our_hp - opp_damage)
             opp_after = max(0.0, opp_hp - (our_damage if our_after > 0.0 else 0.0))
 
+        # Stay-in score: opp commits to attacking with their best move.
+        # Don't penalize for predicted switches here — over-discounting damage
+        # caused a death spiral of constant switching. Switch prediction is
+        # better used to BOOST setup/recovery (free turn value) elsewhere.
         base_score = self._value.score_transition(battle, our_after, opp_after)
 
         # Early-game caution: penalize aggressive attacks when we don't know opp's team.
@@ -257,6 +261,20 @@ class ExpectimaxAgent(Player):
         base_score += our_damage * 0.001  # Damage tiebreaker
 
         return base_score
+
+    def _best_damage_against(self, attacker, defender, battle, type_chart) -> float:
+        """Best damage fraction we can deal with our currently-available moves."""
+        if not attacker or not defender:
+            return 0.0
+        boosts = attacker.boosts or {}
+        best = 0.0
+        for m in battle.available_moves:
+            if (m.base_power or 0) <= 0:
+                continue
+            boost = boosts.get("atk" if _is_physical_move(m) else "spa", 0)
+            d = _damage_fraction(m, attacker, defender, type_chart, atk_boost=boost)
+            best = max(best, d)
+        return best
 
     def _eval_setup_move(self, move, battle, type_chart) -> float:
         """Evaluate setup moves via 2-turn virtual rollout.
@@ -296,7 +314,18 @@ class ExpectimaxAgent(Player):
             our_after = max(0.0, our_after_t1 - opp_damage)
             opp_after = max(0.0, defender.current_hp_fraction - (best_our_damage_t2 if our_after > 0.0 else 0.0))
 
-        return self._value.score_transition(battle, our_after, opp_after)
+        score = self._value.score_transition(battle, our_after, opp_after)
+
+        # If opp will likely switch, setup is a free turn — bonus.
+        # We'd boost without taking damage, then face their counter at +stages.
+        our_best_damage = self._best_damage_against(attacker, defender, battle, type_chart)
+        info_deficit = _info_deficit(battle)
+        switch_prob = _estimate_opp_switch_probability(opp_damage, our_best_damage, info_deficit)
+        if switch_prob > 0.0:
+            # Setup is much better when opp switches: free boost + opp uses turn switching
+            score += switch_prob * 0.15
+
+        return score
 
     def _eval_recovery_move(self, move, battle, type_chart) -> float:
         """Evaluate recovery moves considering actual effective healing.
@@ -525,6 +554,15 @@ class ExpectimaxAgent(Player):
         opp_hp = defender.current_hp_fraction if defender else 1.0
         base_score = self._value.score_transition(battle, our_after, opp_hp)
 
+        # Role-aware boost: defensive Pokemon (Mandibuzz, Toxapex) survive long
+        # enough to make residual damage really pay off. Scale value by how many
+        # turns we'll likely live to apply pressure.
+        if _is_defensive_role(attacker) and opp_damage > 0.0:
+            turns_to_survive = our_hp / max(opp_damage, 0.05)
+            # 3+ turns survival ≈ 1.5x value, capped at 2x for ultra-tanks
+            survivability = min(2.0, max(1.0, turns_to_survive / 3.0))
+            base_value *= survivability
+
         return base_score + base_value * acc
 
     def _eval_switch(self, pokemon, battle, type_chart) -> float:
@@ -549,12 +587,20 @@ class ExpectimaxAgent(Player):
         return base_score + offensive_bonus + info_bonus
 
     def _cached_opp_damage(self, opp, our_pokemon, type_chart) -> float:
-        """Memoized opponent damage fraction lookup."""
+        """Memoized opponent damage fraction lookup.
+
+        Uses sets DB to fill in unrevealed moves so we correctly account for
+        coverage moves opp hasn't shown yet (e.g., a Sinistcha with unseen
+        Shadow Ball that would hit our Psychic switch-in for SE).
+        """
         if not opp or not our_pokemon:
             return 0.0
         key = (id(opp), id(our_pokemon))
         if key not in self._opp_power_cache:
-            self._opp_power_cache[key] = _max_opp_damage_fraction(opp, our_pokemon, type_chart)
+            # Use revealed moves first, fall back to movepool for unrevealed slots
+            best_revealed = _max_opp_damage_fraction(opp, our_pokemon, type_chart)
+            best_with_pool = _max_threat_via_movepool(opp, our_pokemon, type_chart)
+            self._opp_power_cache[key] = max(best_revealed, best_with_pool)
         return self._opp_power_cache[key]
 
 
@@ -703,6 +749,137 @@ def _info_deficit(battle) -> float:
     opp_team = battle.opponent_team or {}
     revealed = len(opp_team)
     return max(0.0, (6 - revealed) / 6.0)
+
+
+def _estimate_opp_switch_probability(opp_damage_to_us: float, our_best_damage: float,
+                                      info_deficit: float) -> float:
+    """Estimate probability M3 switches this turn given the matchup.
+
+    M3's actual logic: switch only if `switch_score > best_move_score * 1.5`,
+    where score = base_power * STAB * effectiveness. So M3 only switches when
+    something on the bench is DRAMATICALLY better — usually only on full
+    immunities (Ground vs Electric, Flying vs Ground, etc.).
+
+    Returns 0.0 (stays) to ~0.85 (definitely swaps).
+    """
+    # Strong signal: we're effectively immune. M3 will almost certainly swap.
+    if opp_damage_to_us <= 0.03:
+        return 0.75
+
+    # Otherwise M3 stays in — its switch threshold is too strict.
+    return 0.0
+
+
+def _predict_opp_switch_in(battle, our_active, type_chart):
+    """Predict which Pokemon opp would switch to, given M3's heuristic.
+
+    M3 picks the bench mon with max (offense - defense_penalty) vs our active.
+    We mirror that calculation across opp's revealed team to find the most
+    likely switch target. Returns None if no revealed bench is available.
+
+    Uses sets DB to fill in unrevealed moves so we can estimate offense even
+    when the bench mon hasn't shown moves yet.
+    """
+    if not our_active:
+        return None
+    opp_team = battle.opponent_team or {}
+    if not opp_team:
+        return None
+
+    active = battle.opponent_active_pokemon
+    best = None
+    best_score = float("-inf")
+    for opp_mon in opp_team.values():
+        if opp_mon is None or opp_mon.fainted:
+            continue
+        # Skip the active Pokemon itself
+        if active is not None and opp_mon.species == active.species:
+            continue
+
+        # Estimate offense: max damage opp_mon can do to our active
+        offense = _max_threat_via_movepool(opp_mon, our_active, type_chart)
+
+        # Defense penalty: how much our active threatens opp_mon
+        defense_penalty = 0.0
+        for atk_type in our_active.types:
+            if atk_type is None:
+                continue
+            eff = atk_type.damage_multiplier(
+                opp_mon.type_1, opp_mon.type_2, type_chart=type_chart
+            )
+            defense_penalty = max(defense_penalty, eff)
+
+        # M3-style score: offense - 0.4 * defense_penalty (normalized)
+        score = offense - 0.4 * defense_penalty
+        if score > best_score:
+            best_score = score
+            best = opp_mon
+
+    return best
+
+
+def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart) -> float:
+    """Estimate opp_mon's max damage to us, using sets DB for unrevealed moves.
+
+    Uses revealed moves first; if fewer than 4 are revealed, fills in from
+    the species' randbat movepool (we don't know their exact 4, but we know
+    the pool of possibilities).
+    """
+    from poke_env.battle.move import Move
+    from bot.data.sets_db import get_movepool
+
+    if opp_mon is None or our_pokemon is None:
+        return 0.0
+
+    revealed = {m.id for m in opp_mon.moves.values()}
+    best = 0.0
+
+    # Revealed damaging moves
+    for m in opp_mon.moves.values():
+        if (m.base_power or 0) > 0:
+            d = _damage_fraction(m, opp_mon, our_pokemon, type_chart)
+            best = max(best, d)
+
+    # Fill in unknown slots from movepool
+    if len(revealed) < 4:
+        movepool = get_movepool(opp_mon.species)
+        for move_id in movepool:
+            if move_id in revealed:
+                continue
+            try:
+                m = Move(move_id, gen=9)
+            except Exception:
+                continue
+            if (m.base_power or 0) <= 0:
+                continue
+            try:
+                d = _damage_fraction(m, opp_mon, our_pokemon, type_chart)
+                best = max(best, d)
+            except Exception:
+                continue
+
+    return best
+
+
+def _is_defensive_role(pokemon) -> bool:
+    """Heuristic: Pokemon is a defensive pivot rather than an attacker.
+
+    A defensive mon's bulk (HP+Def+SpD) significantly exceeds its best
+    offensive stat. Mandibuzz, Toxapex, Ferrothorn → True. Garchomp,
+    Dragapult, Cinderace → False.
+    """
+    if pokemon is None:
+        return False
+    base = pokemon.base_stats or {}
+    atk = base.get("atk") or 100
+    spa = base.get("spa") or 100
+    hp = base.get("hp") or 100
+    defs = base.get("def") or 100
+    spd = base.get("spd") or 100
+    offensive_max = max(atk, spa)
+    bulk_total = hp + defs + spd
+    # Defensive if total bulk > 2.5x best offensive stat
+    return bulk_total > offensive_max * 2.5
 
 
 def _pokemon_type_names(pokemon) -> set:
