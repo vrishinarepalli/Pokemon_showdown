@@ -220,6 +220,15 @@ class ExpectimaxAgent(Player):
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
 
+        # Turn 0 / unknown opp: stay with the lead and attack.
+        # We picked our lead for a reason; switching blind without seeing opp
+        # just gambles. Reward STAB damage moves to make them beat the 0-score baseline.
+        if defender is None:
+            if (move.base_power or 0) > 0:
+                stab_bonus = 0.10 if attacker and move.type in attacker.types else 0.05
+                return stab_bonus
+            return 0.0
+
         # Read our active boosts so Swords Dance, Nasty Plot, etc. are reflected
         boosts = (attacker.boosts if attacker else None) or {}
         is_physical = _is_physical_move(move)
@@ -578,9 +587,11 @@ class ExpectimaxAgent(Player):
 
         # Early-game info-gathering bonus: reward pivots into hard resists when
         # we don't know much about opp's team. Less commit, more scouting.
+        # IMPORTANT: only when opp is actually visible — Turn 0 has no opp,
+        # so blind switching is just gambling, not "scouting".
         info_deficit = _info_deficit(battle)
         info_bonus = 0.0
-        if info_deficit > 0.3 and opp_damage < 0.20:
+        if opp is not None and info_deficit > 0.3 and opp_damage < 0.20:
             # Hard resist switch-in during low-info phase = valuable scouting
             info_bonus = info_deficit * 0.15
 
