@@ -220,14 +220,18 @@ class ExpectimaxAgent(Player):
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
 
-        # Turn 0 / unknown opp: stay with the lead and attack.
-        # We picked our lead for a reason; switching blind without seeing opp
-        # just gambles. Reward STAB damage moves to make them beat the 0-score baseline.
+        # Turn 0: opp lead not yet visible. Score moves by their inherent
+        # power (BP * STAB * accuracy) so we pick our strongest STAB attack.
+        # This reflects: we have no info, so commit to the best move our
+        # lead offers. Switches also score 0 here — both sides are blind.
         if defender is None:
-            if (move.base_power or 0) > 0:
-                stab_bonus = 0.10 if attacker and move.type in attacker.types else 0.05
-                return stab_bonus
-            return 0.0
+            bp = move.base_power or 0
+            if bp <= 0:
+                return 0.0
+            stab = 1.5 if attacker and move.type in attacker.types else 1.0
+            acc = _accuracy(move)
+            # Normalize: a 120 BP STAB move ~= 0.36 baseline
+            return (bp * stab * acc) / 500.0
 
         # Read our active boosts so Swords Dance, Nasty Plot, etc. are reflected
         boosts = (attacker.boosts if attacker else None) or {}
@@ -576,10 +580,29 @@ class ExpectimaxAgent(Player):
 
     def _eval_switch(self, pokemon, battle, type_chart) -> float:
         opp = battle.opponent_active_pokemon
-        opp_damage = self._cached_opp_damage(opp, pokemon, type_chart)
+        # If opp is fainted, they're sending in a fresh mon at full HP — we
+        # can't claim credit for an already-dead Pokemon. Otherwise every
+        # switch would score +1.0 (free KO bonus) and we'd pivot needlessly.
+        opp_is_fainted = opp is not None and (opp.fainted or opp.current_hp_fraction <= 0.0)
+        if opp_is_fainted:
+            # Fresh mon coming. Use unknown-mon threat as expected damage and
+            # the worst threat from opp's revealed bench (sets DB movepool).
+            opp_damage = max(
+                _unknown_mon_threat(pokemon) if _info_deficit(battle) > 0.0 else 0.0,
+                self._max_bench_threat(battle, pokemon, type_chart),
+            )
+            opp_after = 1.0   # Fresh mon will be at full HP
+        else:
+            # Active opp's damage, but also consider that a still-unrevealed
+            # mon could come in to punish our switch-in.
+            current_threat = self._cached_opp_damage(opp, pokemon, type_chart)
+            unknown_threat = _unknown_mon_threat(pokemon) * _info_deficit(battle)
+            bench_threat = self._max_bench_threat(battle, pokemon, type_chart)
+            # Worst-case: weight bench/unknown threats less since opp picks one path
+            opp_damage = max(current_threat, 0.5 * max(unknown_threat, bench_threat))
+            opp_after = opp.current_hp_fraction if opp else 1.0
         hazard = _hazard_damage(pokemon, battle.side_conditions, type_chart)
         our_after = max(0.0, pokemon.current_hp_fraction - hazard - opp_damage)
-        opp_after = opp.current_hp_fraction if opp else 1.0
 
         base_score = self._value.score_transition(battle, our_after, opp_after)
 
@@ -596,6 +619,23 @@ class ExpectimaxAgent(Player):
             info_bonus = info_deficit * 0.15
 
         return base_score + offensive_bonus + info_bonus
+
+    def _max_bench_threat(self, battle, our_pokemon, type_chart) -> float:
+        """Max damage opp's revealed bench mons can do to our switch-in.
+
+        Used to assess whether opp could pivot to punish our switch.
+        """
+        opp_team = battle.opponent_team or {}
+        active = battle.opponent_active_pokemon
+        best = 0.0
+        for opp_mon in opp_team.values():
+            if opp_mon is None or opp_mon.fainted:
+                continue
+            if active is not None and opp_mon.species == active.species:
+                continue
+            threat = _max_threat_via_movepool(opp_mon, our_pokemon, type_chart)
+            best = max(best, threat)
+        return best
 
     def _cached_opp_damage(self, opp, our_pokemon, type_chart) -> float:
         """Memoized opponent damage fraction lookup.
@@ -827,6 +867,38 @@ def _predict_opp_switch_in(battle, our_active, type_chart):
             best = opp_mon
 
     return best
+
+
+# Average attacking stats for an unknown gen9 randbat Pokemon
+# (computed from sets.json: 507 species)
+_AVG_ATK = 96
+_AVG_SPA = 88
+
+
+def _unknown_mon_threat(our_pokemon) -> float:
+    """Estimate damage from an unknown opp mon against our active Pokemon.
+
+    Uses an 80 BP neutral hit with average gen9 metagame attacking stats,
+    100% accuracy, unboosted, no STAB. Returns the higher of physical/special.
+
+    Used to assess threat level of unrevealed slots on opp's team — when we're
+    deciding whether to commit to a matchup, we should consider "any of their
+    5 unknown mons could come in and hit me with this baseline."
+    """
+    if our_pokemon is None:
+        return 0.0
+    level = getattr(our_pokemon, "level", None) or 80
+    hp = _estimate_hp(our_pokemon)
+
+    # Physical hit using avg atk vs our def
+    D_phys = _estimate_stat(our_pokemon, "def")
+    phys_dmg = ((2 * level / 5 + 2) * 80 * _AVG_ATK / D_phys) / 50 + 2
+
+    # Special hit using avg spa vs our spd
+    D_spec = _estimate_stat(our_pokemon, "spd")
+    spec_dmg = ((2 * level / 5 + 2) * 80 * _AVG_SPA / D_spec) / 50 + 2
+
+    return max(phys_dmg, spec_dmg) / hp
 
 
 def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart) -> float:
