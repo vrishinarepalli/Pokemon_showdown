@@ -101,12 +101,12 @@ def analyze_logs(log_file: str = "./battle_logs.json", show_switches: bool = Tru
                     print()
 
         # Show ALL decisions (moves and switches) for detailed analysis
-        print(f"\nDETAILED DECISION LOG (first 3 battles, first 8 turns):")
+        print(f"\nDETAILED DECISION LOG (all battles, all turns):")
         print(f"{'='*70}\n")
 
-        for log in logs[:3]:  # Show first 3 battles
+        for log in logs:
             print(f"\nBattle {log['battle_id']} - Result: {('WIN' if log['winner']=='us' else 'LOSS' if log['winner']=='them' else '??')}:")
-            for turn in log["turns"][:8]:  # First 8 turns
+            for turn in log["turns"]:
                 print(f"\n  Turn {turn['turn']}: {turn['our_pokemon']} (HP {turn['our_hp']:.0%}) vs {turn['opp_pokemon']} (HP {turn['opp_hp']:.0%})")
 
                 # Show what opponent did last turn (visible at start of this turn)
