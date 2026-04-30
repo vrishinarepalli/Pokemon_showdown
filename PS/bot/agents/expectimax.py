@@ -1453,6 +1453,10 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
     atk_boost: stage count to apply to attacker's attack stat (for setup rollouts
     where we're projecting future state). Defender's current defensive boost
     is read automatically from defender.boosts.
+
+    Critical hits: ignores base 6.25% crit rate (random anomaly). Only accounts
+    for high-crit moves (12.5%+) or guaranteed crits.
+
     Returns fraction in [0, 1+] (may exceed 1 for OHKOs).
     """
     bp = move.base_power or 0
@@ -1483,7 +1487,17 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
     acc = _accuracy(move)
 
     base_damage = ((2 * level / 5 + 2) * bp * A / D) / 50 + 2
-    return base_damage * stab * eff * acc / hp
+
+    # High-crit rate handling: only apply if move has guaranteed or 12.5%+ crit rate
+    # (e.g., Stone Edge 12.5%, Scope Lens users, moves with guaranteed crit)
+    # Ignore base 6.25% crit as random noise
+    crit_mult = 1.0
+    crit_rate = getattr(move, "crit_ratio", 0) or 0
+    # In poke-env, crit_ratio of 1 = 6.25%, 2 = 12.5%, etc.
+    if crit_rate >= 2:  # 12.5% or higher
+        crit_mult = 1.5  # Crits deal 1.5x damage in Gen 9
+
+    return base_damage * stab * eff * acc * crit_mult / hp
 
 
 def _max_opp_damage_fraction(opp, our_pokemon, type_chart) -> float:
