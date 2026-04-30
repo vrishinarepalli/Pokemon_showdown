@@ -655,14 +655,12 @@ class ExpectimaxAgent(Player):
 
         # Check type advantage: for each opponent type, see if moves of that type
         # are super-effective against us.
-        for opp_type_name in [defender.type_1, defender.type_2]:
-            if opp_type_name:
-                opp_type = getattr(type_chart, opp_type_name.lower(), None) or opp_type_name
-                if hasattr(opp_type, 'damage_multiplier'):
-                    dmg_mult = opp_type.damage_multiplier(attacker.type_1, attacker.type_2, type_chart=type_chart)
-                    # If opponent's type is 2x effective or higher against us, setup is risky
-                    if dmg_mult >= 2.0:
-                        return _EvalResult(float("-inf"), is_setup=True, reasoning=f"We're weak to {opp_type_name} (opponent's type), cannot setup safely")
+        for opp_type in [defender.type_1, defender.type_2]:
+            if opp_type:
+                dmg_mult = opp_type.damage_multiplier(attacker.type_1, attacker.type_2, type_chart=type_chart)
+                # If opponent's type is 2x effective or higher against us, setup is risky
+                if dmg_mult >= 2.0:
+                    return _EvalResult(float("-inf"), is_setup=True, reasoning=f"We're weak to {opp_type} (opponent's type), cannot setup safely")
 
         our_hp_t1 = attacker.current_hp_fraction if attacker else 1.0
         our_after_t1 = max(0.0, our_hp_t1 - opp_damage)
@@ -1005,14 +1003,12 @@ class ExpectimaxAgent(Player):
         # CRITICAL: Never switch into a type that opponent is super-effective against.
         # If opponent's type is 2x+ effective against our switch-in, this is a terrible idea.
         if opp is not None:
-            for opp_type_name in [opp.type_1, opp.type_2]:
-                if opp_type_name:
-                    opp_type = getattr(type_chart, opp_type_name.lower(), None) or opp_type_name
-                    if hasattr(opp_type, 'damage_multiplier'):
-                        dmg_mult = opp_type.damage_multiplier(pokemon.type_1, pokemon.type_2, type_chart=type_chart)
-                        # If opponent's type is 2x+ effective against our switch-in, heavily penalize
-                        if dmg_mult >= 2.0:
-                            return _EvalResult(float("-inf"), reasoning=f"Switch target {pokemon.species} is weak to {opp_type_name}")
+            for opp_type in [opp.type_1, opp.type_2]:
+                if opp_type:
+                    dmg_mult = opp_type.damage_multiplier(pokemon.type_1, pokemon.type_2, type_chart=type_chart)
+                    # If opponent's type is 2x+ effective against our switch-in, heavily penalize
+                    if dmg_mult >= 2.0:
+                        return _EvalResult(float("-inf"), reasoning=f"Switch target {pokemon.species} is weak to {opp_type}")
 
         # If opp is fainted, they're sending in a fresh mon at full HP — we
         # can't claim credit for an already-dead Pokemon. Otherwise every
