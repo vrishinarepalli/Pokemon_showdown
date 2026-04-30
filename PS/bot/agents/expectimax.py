@@ -61,11 +61,19 @@ class ExpectimaxAgent(Player):
         self._opp_power_cache = {}  # (opp_id, our_id, gen) → power
         self._battle_logger = None  # Created per battle
         self._battle_logs = []  # All completed battle logs
+        self._strategic_ctx = None  # Per-turn strategic state (set in choose_move)
 
     def choose_move(self, battle):
         announce_team(self, battle)
         type_chart = GenData.from_gen(battle.gen).type_chart
         self._opp_power_cache.clear()  # Fresh cache per turn
+
+        # Compute once per turn: aggregate threat assessment + opp action prediction.
+        # Used by move/switch evaluators to apply strategic context (SAFE/TRADEOFF/DANGER).
+        if battle.active_pokemon is not None:
+            self._strategic_ctx = _strategic_context(battle, battle.active_pokemon, type_chart)
+        else:
+            self._strategic_ctx = None
 
         # Initialize logger on first turn of each battle
         if self._battle_logger is None:
@@ -344,6 +352,15 @@ class ExpectimaxAgent(Player):
             # Setup is much better when opp switches: free boost + opp uses turn switching
             score += switch_prob * 0.15
 
+        # Strategic context: SAFE state = aggregate threat is low across opp's
+        # whole team, so setting up is much safer (we can survive multiple turns).
+        ctx = self._strategic_ctx
+        if ctx is not None:
+            if ctx["state"] == "SAFE":
+                score += 0.15  # Strong bonus: opp can't hurt us much
+            elif ctx["state"] == "DANGER":
+                score -= 0.10  # Avoid setup when threats loom
+
         return score
 
     def _eval_recovery_move(self, move, battle, type_chart) -> float:
@@ -470,6 +487,16 @@ class ExpectimaxAgent(Player):
 
         opp_hp = defender.current_hp_fraction if defender else 1.0
         base_score = self._value.score_transition(battle, our_after, opp_hp)
+
+        # Strategic context: hazards are gold when opp has many switches AND
+        # we're safe (won't lose HP setting them). They're also more valuable
+        # when opp is predicted to switch (the switch eats hazard damage).
+        ctx = self._strategic_ctx
+        if ctx is not None:
+            if ctx["state"] == "SAFE" and opp_mons_left >= 4:
+                value *= 1.4  # Early-game safe hazards are highest-EV play
+            if ctx["opp_will_switch"]:
+                value *= 1.2  # Opp switching = immediate hazard payoff
 
         return base_score + value
 
@@ -629,7 +656,23 @@ class ExpectimaxAgent(Player):
             # Hard resist switch-in during low-info phase = valuable scouting
             info_bonus = info_deficit * 0.15
 
-        return base_score + offensive_bonus + info_bonus
+        # Strategic context adjustments:
+        # 1. SAFE state: active mon isn't threatened, switching wastes momentum
+        # 2. DANGER + switch-in dies: this is a wasted switch (sacrifice cycle)
+        ctx = self._strategic_ctx
+        ctx_adj = 0.0
+        if ctx is not None:
+            active = battle.active_pokemon
+            if ctx["state"] == "SAFE" and active is not None:
+                # Active is safe — switching forfeits a turn for no reason
+                ctx_adj -= 0.10
+            # Sacrifice cycle prevention: heavy penalty for switching INTO a KO.
+            # If switch target gets OHKO'd by predicted opp action, this is throwing
+            # the mon away. Better to stay and extract value with active.
+            if our_after <= 0.0:
+                ctx_adj -= 0.30
+
+        return base_score + offensive_bonus + info_bonus + ctx_adj
 
     def _max_bench_threat(self, battle, our_pokemon, type_chart) -> float:
         """Max damage opp's revealed bench mons can do to our switch-in.
@@ -926,6 +969,150 @@ def _unknown_mon_threat(our_pokemon) -> float:
     spec_dmg = ((2 * level / 5 + 2) * 80 * _AVG_SPA / D_spec) / 50 + 2
 
     return max(phys_dmg, spec_dmg) / hp
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Strategic prediction layer
+#
+# These helpers aggregate information about the opponent's likely actions
+# and damage potential, exploiting M3's predictable behavior:
+#   - M3 picks max-damage move OR switches if a bench mon does ≥1.5× more
+#   - No setup, no recovery, no hazards
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _compute_opp_max_threat(battle, our_pokemon, type_chart):
+    """Aggregate max damage opp can deal to our_pokemon across their entire team.
+
+    Considers:
+      - All revealed opp mons (active + bench), using revealed moves + movepool
+      - Unknown mons (synthetic 80 BP baseline)
+
+    Returns dict:
+      - max_damage: float (fraction of our HP)
+      - source: species name or "unknown"
+      - active_threat: damage from currently-active opp mon
+      - bench_threat: max damage from any revealed bench mon
+      - unknown_threat: synthetic baseline (0 if all 6 revealed)
+    """
+    if our_pokemon is None:
+        return {"max_damage": 0.0, "source": None, "active_threat": 0.0,
+                "bench_threat": 0.0, "unknown_threat": 0.0}
+
+    opp_team = battle.opponent_team or {}
+    active = battle.opponent_active_pokemon
+
+    # Active mon threat
+    active_threat = 0.0
+    active_species = None
+    if active is not None and not active.fainted:
+        active_threat = _max_threat_via_movepool(active, our_pokemon, type_chart)
+        active_species = active.species
+
+    # Bench threats (revealed but not active)
+    bench_threat = 0.0
+    bench_species = None
+    for opp_mon in opp_team.values():
+        if opp_mon is None or opp_mon.fainted:
+            continue
+        if active is not None and opp_mon.species == active.species:
+            continue
+        threat = _max_threat_via_movepool(opp_mon, our_pokemon, type_chart)
+        if threat > bench_threat:
+            bench_threat = threat
+            bench_species = opp_mon.species
+
+    # Unknown mon synthetic threat (only if not all 6 revealed)
+    unknown_threat = 0.0
+    n_revealed = sum(1 for m in opp_team.values() if m is not None)
+    if n_revealed < 6:
+        unknown_threat = _unknown_mon_threat(our_pokemon)
+
+    # Pick worst case across all sources
+    candidates = [
+        (active_threat, active_species),
+        (bench_threat, bench_species),
+        (unknown_threat, "unknown" if unknown_threat > 0 else None),
+    ]
+    max_damage, source = max(candidates, key=lambda x: x[0])
+
+    return {
+        "max_damage": max_damage,
+        "source": source,
+        "active_threat": active_threat,
+        "bench_threat": bench_threat,
+        "unknown_threat": unknown_threat,
+    }
+
+
+def _predict_opp_action(battle, our_pokemon, type_chart):
+    """Predict M3-style opponent's action this turn.
+
+    M3's logic (from heuristic.py):
+      - matchup_score = max_BP_offense - max_BP_defense_threat
+      - switch if best_bench.matchup > active.matchup * 1.5
+
+    Returns dict:
+      - action: "attack" or "switch"
+      - target: species (if switch) or None
+      - expected_damage: best damage they'll deal to our_pokemon
+    """
+    active = battle.opponent_active_pokemon
+    if active is None or active.fainted:
+        # Forced switch (active fainted)
+        target = _predict_opp_switch_in(battle, our_pokemon, type_chart)
+        target_species = target.species if target else None
+        target_damage = _max_threat_via_movepool(target, our_pokemon, type_chart) if target else 0.0
+        return {"action": "switch", "target": target_species, "expected_damage": target_damage}
+
+    active_damage = _max_threat_via_movepool(active, our_pokemon, type_chart)
+
+    # Use existing M3 switch probability to decide stay vs switch
+    info_deficit = _info_deficit(battle)
+    our_best = 0.0  # We don't need exact, just check switch-prob threshold
+    switch_prob = _estimate_opp_switch_probability(active_damage, our_best, info_deficit)
+
+    if switch_prob >= 0.5:
+        target = _predict_opp_switch_in(battle, our_pokemon, type_chart)
+        if target is not None:
+            target_damage = _max_threat_via_movepool(target, our_pokemon, type_chart)
+            return {"action": "switch", "target": target.species, "expected_damage": target_damage}
+
+    return {"action": "attack", "target": None, "expected_damage": active_damage}
+
+
+# Strategic state thresholds (fraction of our HP opp can deal in a turn)
+_THREAT_SAFE = 0.33    # below this: we can setup/attack freely
+_THREAT_DANGER = 0.50  # above this: we should consider defensive play
+
+
+def _strategic_context(battle, our_pokemon, type_chart):
+    """Classify the current matchup state and predict opp behavior.
+
+    Returns dict:
+      - state: "SAFE" / "TRADEOFF" / "DANGER"
+      - opp_max_damage: max damage opp can deal across their team
+      - opp_will_switch: bool — is opp likely to switch this turn?
+      - threat_breakdown: dict from _compute_opp_max_threat
+      - predicted_action: dict from _predict_opp_action
+    """
+    threat = _compute_opp_max_threat(battle, our_pokemon, type_chart)
+    action = _predict_opp_action(battle, our_pokemon, type_chart)
+
+    if threat["max_damage"] < _THREAT_SAFE:
+        state = "SAFE"
+    elif threat["max_damage"] < _THREAT_DANGER:
+        state = "TRADEOFF"
+    else:
+        state = "DANGER"
+
+    return {
+        "state": state,
+        "opp_max_damage": threat["max_damage"],
+        "opp_will_switch": action["action"] == "switch",
+        "threat_breakdown": threat,
+        "predicted_action": action,
+    }
 
 
 def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart) -> float:
