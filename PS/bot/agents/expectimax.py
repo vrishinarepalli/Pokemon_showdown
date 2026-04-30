@@ -214,18 +214,6 @@ def _check_ability_matchup(defender, move_type, type_eff: float = 1.0, move=None
     return (mult, False)
 
 
-def _is_opponent_sweeping(battle) -> bool:
-    """Check if opponent is in a sweep (attacking repeatedly, not switching).
-
-    Detects if opponent's active mon is winning streak and didn't switch last turn.
-    """
-    opp = battle.opponent_active_pokemon
-    if opp is None:
-        return False
-    # If they attacked last turn (didn't switch) and we took damage, they're sweeping
-    return getattr(battle, "_last_opp_action", None) == "move"
-
-
 def _find_least_valuable_mon(battle) -> tuple:
     """Find the mon we should sacrifice in a sweep scenario.
 
@@ -260,6 +248,13 @@ class ExpectimaxAgent(Player):
         self._battle_logs = []  # All completed battle logs
         self._strategic_ctx = None  # Per-turn strategic state (set in choose_move)
         self._opp_tracker = None    # Per-battle opp set tracker (created on first turn)
+        # Sweep state: tracks opponent attack pattern across turns
+        self._sweep_state = {
+            "consecutive_attacks": 0,  # Turns opponent has attacked in a row (no switch)
+            "last_opp_action": None,   # "move" or "switch"
+            "last_opp_species": None,  # Track if opponent's mon changed
+            "our_hp_lost": 0.0,        # Total HP we've lost in the streak
+        }
 
     def choose_move(self, battle):
         announce_team(self, battle)
@@ -334,6 +329,22 @@ class ExpectimaxAgent(Player):
                 opp_last_action = "switch"
                 opp_prev_pokemon = self._prev_opp_pokemon
 
+        # Update sweep state: consecutive attacks from opponent indicate a sweep
+        if opp_last_action == "switch":
+            # Opponent pivoted: reset sweep counter
+            self._sweep_state["consecutive_attacks"] = 0
+            self._sweep_state["our_hp_lost"] = 0.0
+        elif opp_last_action == "move":
+            # Opponent attacked: increment streak
+            self._sweep_state["consecutive_attacks"] += 1
+            # Track damage dealt to our active mon (rough estimate)
+            prev_hp = getattr(self, "_prev_our_hp", 1.0)
+            damage_taken = max(0.0, prev_hp - our_hp)
+            self._sweep_state["our_hp_lost"] += damage_taken
+        self._sweep_state["last_opp_action"] = opp_last_action
+        self._sweep_state["last_opp_species"] = opp_pokemon
+        self._prev_our_hp = our_hp
+
         # Extract strategic context for logging
         strategic_state = ""
         active_threat = 0.0
@@ -342,7 +353,16 @@ class ExpectimaxAgent(Player):
         we_go_first = False
         opp_predicted_action = ""
         opp_predicted_damage = 0.0
-        opp_set_predictions = {}
+        # Include sweep state for debugging the sacrifice logic
+        is_real_sweep = (
+            self._sweep_state["consecutive_attacks"] >= 2
+            and self._sweep_state["our_hp_lost"] > 0.30
+        )
+        opp_set_predictions = {
+            "sweep_consecutive_attacks": self._sweep_state["consecutive_attacks"],
+            "sweep_hp_lost": round(self._sweep_state["our_hp_lost"], 3),
+            "sweep_active": is_real_sweep,
+        }
 
         if self._strategic_ctx:
             strategic_state = self._strategic_ctx["state"]
@@ -496,6 +516,14 @@ class ExpectimaxAgent(Player):
             self._battle_logger = None
             self._prev_opp_pokemon = None
             self._opp_tracker = None  # Reset per-battle opp set tracker
+            # Reset sweep state for next battle
+            self._sweep_state = {
+                "consecutive_attacks": 0,
+                "last_opp_action": None,
+                "last_opp_species": None,
+                "our_hp_lost": 0.0,
+            }
+            self._prev_our_hp = 1.0
 
     def save_battle_logs(self, filename: str):
         """Save all battle logs to a JSON file."""
@@ -1027,10 +1055,14 @@ class ExpectimaxAgent(Player):
                 # Active is safe — switching forfeits a turn for no reason
                 ctx_adj -= 0.10
 
-            # Sweep detection: if opponent is attacking repeatedly (didn't switch)
-            # and we're in danger, prefer to sacrifice low-value mons.
+            # Sweep detection: opponent attacking repeatedly (2+ turns) AND we lost HP.
+            # In a real sweep, prefer to sacrifice low-value mons to break momentum.
             # This stops the "spam-switch into a sweep" death spiral.
-            if ctx["state"] == "DANGER":
+            is_real_sweep = (
+                self._sweep_state["consecutive_attacks"] >= 2
+                and self._sweep_state["our_hp_lost"] > 0.30
+            )
+            if ctx["state"] == "DANGER" and is_real_sweep:
                 least_valuable, least_value = _find_least_valuable_mon(battle)
                 active_value = _mon_value(active) if active else 0.0
                 switch_value = _mon_value(pokemon)
