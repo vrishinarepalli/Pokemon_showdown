@@ -84,12 +84,14 @@ def _mon_value(pokemon) -> float:
 
 
 # Type immunity abilities: defender takes 0 damage from this move type
-# (no healing, just immune)
+# (no healing, just immune — may have other effects like stat boosts)
 _ABILITY_TYPE_IMMUNITY = {
     "flashfire": "FIRE",        # Immune to fire, boosts fire moves on hit
     "sapsipper": "GRASS",       # Immune to grass, +1 atk on hit
     "levitate": "GROUND",       # Immune to ground moves
     "motordrive": "ELECTRIC",   # Immune to electric, +1 speed on hit
+    "lightningrod": "ELECTRIC", # Immune to electric, +1 spa on hit (NOT heal)
+    "stormdrain": "WATER",      # Immune to water, +1 spa on hit (NOT heal)
     "wonderguard": "*",         # Only super-effective hits work
 }
 
@@ -97,9 +99,7 @@ _ABILITY_TYPE_IMMUNITY = {
 _ABILITY_HEALING = {
     "waterabsorb": ("WATER",),       # 0 dmg + heals on water moves
     "voltabsorb": ("ELECTRIC",),     # 0 dmg + heals on electric moves
-    "dryskin": ("WATER",),           # 0 dmg + heals on water moves (NOT reduced damage)
-    "stormdrain": ("WATER",),        # 0 dmg + redirects water
-    "lightningrod": ("ELECTRIC",),   # 0 dmg + redirects electric
+    "dryskin": ("WATER",),           # 0 dmg + heals on water moves
     "earth_eater": ("GROUND",),      # 0 dmg + heals on ground moves
 }
 
@@ -120,11 +120,19 @@ _ABILITY_DAMAGE_REDUCTION = {
         "FIRE": 1.25,   # Dry Skin takes 25% MORE from fire (already heals on water)
     },
     "fluffy": {
-        "FIRE": 2.0,    # Fluffy: takes 2x fire damage (halves contact - separate)
+        "FIRE": 2.0,    # Fluffy: takes 2x fire damage
     },
     "purifyingsalt": {
         "GHOST": 0.5,   # Halves ghost damage + status immunity
     },
+}
+
+# Contact move damage modifiers: ability -> multiplier
+# Applied based on move.makes_contact / move flags, not type
+_ABILITY_CONTACT_MOD = {
+    "fluffy": 0.5,        # Halves damage from contact moves
+    "rockyhelmet": 1.0,   # No damage modifier but recoils attacker
+    "ironbarbs": 1.0,     # Same as rocky helmet
 }
 
 # Super-effective resistance abilities: reduce SE damage to 0.75x
@@ -138,15 +146,33 @@ _ABILITY_MULTI_HIT_REDUCE = {
 }
 
 
-def _check_ability_matchup(defender, move_type, type_eff: float = 1.0) -> tuple:
+def _move_makes_contact(move) -> bool:
+    """Check if a move makes physical contact (for Fluffy, Rocky Helmet, etc.)."""
+    if not move:
+        return False
+    # Status moves don't make contact
+    if (move.base_power or 0) <= 0:
+        return False
+    # Check move flags - poke-env exposes flags dict on Move objects
+    flags = getattr(move, "flags", None) or {}
+    if isinstance(flags, dict):
+        return bool(flags.get("contact"))
+    # Fallback: physical moves typically make contact (most do, but not all)
+    return _is_physical_move(move)
+
+
+def _check_ability_matchup(defender, move_type, type_eff: float = 1.0, move=None) -> tuple:
     """Check if defender's ability affects damage from this move type.
 
     Returns (damage_multiplier, heals) where:
     - damage_multiplier: 0.0 = immune, 0.5 = halved, 1.0 = normal, etc.
     - heals: True if the defender heals instead of taking damage
 
-    type_eff: type effectiveness (passed in to handle abilities like Solid Rock
-    that only reduce super-effective damage).
+    Args:
+        defender: the defending Pokemon
+        move_type: the type of the incoming move
+        type_eff: type effectiveness (for Solid Rock-like abilities)
+        move: the full move object (for contact-based abilities like Fluffy)
     """
     ability = _norm(getattr(defender, "ability", None))
     if not ability:
@@ -169,17 +195,25 @@ def _check_ability_matchup(defender, move_type, type_eff: float = 1.0) -> tuple:
                 return (1.0, False)
             return (0.0, False)
 
-    # Damage reduction abilities (Thick Fat, Heatproof)
+    # Start with a 1.0 multiplier and stack reductions
+    mult = 1.0
+
+    # Damage reduction abilities (Thick Fat, Heatproof, Dry Skin fire bonus)
     if ability in _ABILITY_DAMAGE_REDUCTION:
         reductions = _ABILITY_DAMAGE_REDUCTION[ability]
         if type_name in reductions:
-            return (reductions[type_name], False)
+            mult *= reductions[type_name]
 
     # Super-effective resistance (Solid Rock, Filter, Prism Armor)
     if ability in _ABILITY_SE_RESIST and type_eff > 1.0:
-        return (0.75, False)
+        mult *= 0.75
 
-    return (1.0, False)
+    # Contact move modifiers (Fluffy halves contact damage)
+    if move is not None and ability in _ABILITY_CONTACT_MOD:
+        if _move_makes_contact(move):
+            mult *= _ABILITY_CONTACT_MOD[ability]
+
+    return (mult, False)
 
 
 def _is_opponent_sweeping(battle) -> bool:
@@ -964,7 +998,7 @@ class ExpectimaxAgent(Player):
                     pokemon.type_1, pokemon.type_2, type_chart=type_chart
                 )
                 ability_mult, heals = _check_ability_matchup(
-                    pokemon, best_move.type, type_eff=eff
+                    pokemon, best_move.type, type_eff=eff, move=best_move
                 )
                 if heals:
                     ability_bonus = 0.25  # Huge bonus: we heal from their move
@@ -1691,8 +1725,10 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
 
     # Ability interactions: immunity, healing, damage reduction
     # E.g., Water Absorb on water moves = 0 damage + heal
-    # E.g., Solid Rock = 0.75x super-effective damage (needs eff)
-    ability_mult, heals = _check_ability_matchup(defender, move.type, type_eff=eff)
+    # E.g., Fluffy halves contact moves (needs full move object)
+    ability_mult, heals = _check_ability_matchup(
+        defender, move.type, type_eff=eff, move=move
+    )
 
     if heals:
         # Defender heals: effectively 0 damage (actually benefits them)
