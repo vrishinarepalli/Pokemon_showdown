@@ -69,6 +69,57 @@ class _EvalResult:
         self.reasoning = reasoning
 
 
+def _mon_value(pokemon) -> float:
+    """Calculate mon's strategic value: hp * (speed / 200).
+
+    Used to identify which mon to sacrifice vs which to preserve.
+    Low value = good sacrifice candidate (low HP or slow).
+    High value = preserve, save for later.
+    """
+    if not pokemon:
+        return 0.0
+    hp = pokemon.current_hp_fraction if pokemon else 1.0
+    base_speed = (pokemon.base_stats or {}).get("spe", 100)
+    return hp * (base_speed / 200.0)
+
+
+def _is_opponent_sweeping(battle) -> bool:
+    """Check if opponent is in a sweep (attacking repeatedly, not switching).
+
+    Detects if opponent's active mon is winning streak and didn't switch last turn.
+    """
+    opp = battle.opponent_active_pokemon
+    if opp is None:
+        return False
+    # If they attacked last turn (didn't switch) and we took damage, they're sweeping
+    return getattr(battle, "_last_opp_action", None) == "move"
+
+
+def _find_least_valuable_mon(battle) -> tuple:
+    """Find the mon we should sacrifice in a sweep scenario.
+
+    Returns (mon, value) — the mon with lowest strategic value to let take the hit.
+    Preserves high-value mons for later in the game.
+    """
+    our_team = battle.team or {}
+    active = battle.active_pokemon
+    least_valuable = None
+    least_value = float("inf")
+
+    for mon in our_team.values():
+        if mon is None or mon.fainted:
+            continue
+        # Don't sacrifice the active mon yet (it's already in)
+        if active and mon.species == active.species:
+            continue
+        value = _mon_value(mon)
+        if value < least_value:
+            least_value = value
+            least_valuable = mon
+
+    return (least_valuable, least_value) if least_valuable else (None, float("inf"))
+
+
 class ExpectimaxAgent(Player):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -809,6 +860,7 @@ class ExpectimaxAgent(Player):
         # Strategic context adjustments:
         # 1. SAFE state: active mon isn't threatened, switching wastes momentum
         # 2. DANGER + switch-in dies: this is a wasted switch (sacrifice cycle)
+        # 3. DANGER + sweep: reward sacrificing low-value mons, penalize wasting high-value ones
         ctx = self._strategic_ctx
         ctx_adj = 0.0
         if ctx is not None:
@@ -816,6 +868,23 @@ class ExpectimaxAgent(Player):
             if ctx["state"] == "SAFE" and active is not None:
                 # Active is safe — switching forfeits a turn for no reason
                 ctx_adj -= 0.10
+
+            # Sweep detection: if opponent is attacking repeatedly (didn't switch)
+            # and we're in danger, prefer to sacrifice low-value mons.
+            # This stops the "spam-switch into a sweep" death spiral.
+            if ctx["state"] == "DANGER":
+                least_valuable, least_value = _find_least_valuable_mon(battle)
+                active_value = _mon_value(active) if active else 0.0
+                switch_value = _mon_value(pokemon)
+
+                # If this is the least valuable mon, bonus for sacrificing it
+                if least_valuable and pokemon.species == least_valuable.species:
+                    ctx_adj += 0.15  # Bonus: good sacrifice choice
+                # If this is a high-value mon and active is low-value, penalty
+                # (don't waste the good mon to save the bad one)
+                elif active is not None and switch_value > active_value * 1.5:
+                    ctx_adj -= 0.15  # Penalty: wasting a good mon
+
             # Sacrifice cycle prevention: heavy penalty for switching INTO a KO.
             # If switch target gets OHKO'd by predicted opp action, this is throwing
             # the mon away. Better to stay and extract value with active.
@@ -823,7 +892,7 @@ class ExpectimaxAgent(Player):
                 ctx_adj -= 0.30
 
         score = base_score + offensive_bonus + info_bonus + ctx_adj
-        reasoning = f"switch_to {pokemon.species}: hazard_dmg={hazard:.3f}, opp_dmg={opp_damage:.3f}"
+        reasoning = f"switch_to {pokemon.species}: hazard_dmg={hazard:.3f}, opp_dmg={opp_damage:.3f}, value={_mon_value(pokemon):.3f}"
         return _EvalResult(
             score,
             damage_taken=opp_damage + hazard,
