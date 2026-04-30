@@ -83,6 +83,55 @@ def _mon_value(pokemon) -> float:
     return hp * (base_speed / 200.0)
 
 
+# Abilities that provide immunity, healing, or damage reduction to specific move types
+_ABILITY_IMMUNITIES = {
+    "waterabsorb": "water",      # Immune to water, heals on hit
+    "voltabsorb": "electric",    # Immune to electric, heals on hit
+    "flashfire": "fire",         # Immune to fire, boost on hit
+    "sapsipper": "grass",        # Immune to grass, atk boost on hit
+    "dryskincalm": "water",      # Takes 1/8 damage from water (vs 2x), heals
+}
+
+_ABILITY_HEALING = {
+    "waterabsorb": ("water",),    # Heals on water move
+    "voltabsorb": ("electric",),  # Heals on electric move
+    "dryskin": ("water",),        # Heals on water move (but takes 1/8 damage)
+}
+
+_ABILITY_DAMAGE_REDUCTION = {
+    "dryskin": {
+        "water": 0.125,  # Takes 1/8 damage instead of normal
+    },
+    "wonderguard": None,  # Super-tanky (only weak hits through)
+}
+
+
+def _check_ability_matchup(defender, move_type) -> tuple:
+    """Check if defender's ability affects damage from this move type.
+
+    Returns (damage_multiplier, heals) where:
+    - damage_multiplier: 0.0 = immune, 0.125 = 1/8 damage, 1.0 = normal, etc.
+    - heals: True if the defender heals instead of taking damage
+    """
+    ability = _norm(getattr(defender, "ability", None))
+    if not ability:
+        return (1.0, False)
+
+    # Check immunity + healing (Water Absorb, Volt Absorb)
+    if ability in _ABILITY_HEALING:
+        ability_types = _ABILITY_HEALING[ability]
+        if move_type in ability_types:
+            return (0.0, True)  # Immune and heals
+
+    # Check damage reduction (Dry Skin on water)
+    if ability in _ABILITY_DAMAGE_REDUCTION:
+        reductions = _ABILITY_DAMAGE_REDUCTION[ability]
+        if move_type in reductions:
+            return (reductions[move_type], False)
+
+    return (1.0, False)
+
+
 def _is_opponent_sweeping(battle) -> bool:
     """Check if opponent is in a sweep (attacking repeatedly, not switching).
 
@@ -847,6 +896,25 @@ class ExpectimaxAgent(Player):
 
         offensive_bonus = _switch_offensive_bonus(pokemon, opp, type_chart)
 
+        # Ability matchup bonus: if switching into a mon with ability that counters
+        # opponent's move type (e.g., Water Absorb vs Wave Crash), huge bonus.
+        ability_bonus = 0.0
+        if opp is not None:
+            # Find opponent's likely move type (best damaging move)
+            best_move = None
+            best_bp = 0
+            for move in opp.moves.values():
+                bp = move.base_power or 0
+                if bp > best_bp:
+                    best_bp = bp
+                    best_move = move
+            if best_move:
+                ability_mult, heals = _check_ability_matchup(pokemon, best_move.type)
+                if heals:
+                    ability_bonus = 0.25  # Huge bonus: we heal from their move
+                elif ability_mult < 1.0:
+                    ability_bonus = 0.10  # Minor bonus: damage reduction
+
         # Early-game info-gathering bonus: reward pivots into hard resists when
         # we don't know much about opp's team. Less commit, more scouting.
         # IMPORTANT: only when opp is actually visible — Turn 0 has no opp,
@@ -891,8 +959,8 @@ class ExpectimaxAgent(Player):
             if our_after <= 0.0:
                 ctx_adj -= 0.30
 
-        score = base_score + offensive_bonus + info_bonus + ctx_adj
-        reasoning = f"switch_to {pokemon.species}: hazard_dmg={hazard:.3f}, opp_dmg={opp_damage:.3f}, value={_mon_value(pokemon):.3f}"
+        score = base_score + offensive_bonus + info_bonus + ability_bonus + ctx_adj
+        reasoning = f"switch_to {pokemon.species}: hazard_dmg={hazard:.3f}, opp_dmg={opp_damage:.3f}, value={_mon_value(pokemon):.3f}, ability_bonus={ability_bonus:.3f}"
         return _EvalResult(
             score,
             damage_taken=opp_damage + hazard,
@@ -1558,15 +1626,22 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
     base_damage = ((2 * level / 5 + 2) * bp * A / D) / 50 + 2
 
     # High-crit rate handling: only apply if move has guaranteed or 12.5%+ crit rate
-    # (e.g., Stone Edge 12.5%, Scope Lens users, moves with guaranteed crit)
-    # Ignore base 6.25% crit as random noise
     crit_mult = 1.0
     crit_rate = getattr(move, "crit_ratio", 0) or 0
-    # In poke-env, crit_ratio of 1 = 6.25%, 2 = 12.5%, etc.
     if crit_rate >= 2:  # 12.5% or higher
-        crit_mult = 1.5  # Crits deal 1.5x damage in Gen 9
+        crit_mult = 1.5
 
-    return base_damage * stab * eff * acc * crit_mult / hp
+    # Ability interactions: immunity, healing, damage reduction
+    # E.g., Water Absorb on water moves = 0 damage + heal
+    # E.g., Dry Skin on water = 1/8 damage instead of normal
+    ability_mult, heals = _check_ability_matchup(defender, move.type)
+
+    if heals:
+        # Defender heals: effectively 0 damage (actually benefits them)
+        return 0.0
+
+    damage = base_damage * stab * eff * acc * crit_mult * ability_mult / hp
+    return damage
 
 
 def _max_opp_damage_fraction(opp, our_pokemon, type_chart) -> float:
