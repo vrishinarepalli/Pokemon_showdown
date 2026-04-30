@@ -371,7 +371,16 @@ class ExpectimaxAgent(Player):
             unknown_threat = self._strategic_ctx["threat_breakdown"].get("unknown_threat", 0.0)
             opp_predicted_action = self._strategic_ctx["predicted_action"]["action"]
             opp_predicted_damage = self._strategic_ctx["predicted_action"]["expected_damage"]
-            we_go_first = self._we_go_first(battle) if battle.active_pokemon else False
+            # For logging: check if we generally go first (without considering move priority)
+            if battle.active_pokemon and battle.opponent_active_pokemon:
+                our_speed = _effective_speed(battle.active_pokemon, use_actual=True)
+                opp_speed = _effective_speed(battle.opponent_active_pokemon, use_actual=False)
+                if _trick_room_active(battle):
+                    we_go_first = our_speed <= opp_speed
+                else:
+                    we_go_first = our_speed >= opp_speed
+            else:
+                we_go_first = False
 
         # Get speed stages for logging
         our_speed_stage = battle.active_pokemon.speed_boosts if battle.active_pokemon else 0
