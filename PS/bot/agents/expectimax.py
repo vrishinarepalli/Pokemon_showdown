@@ -97,10 +97,10 @@ _ABILITY_TYPE_IMMUNITY = {
 
 # Healing abilities: defender heals 25% HP instead of taking damage (0 damage)
 _ABILITY_HEALING = {
-    "waterabsorb": ("WATER",),       # 0 dmg + heals on water moves
-    "voltabsorb": ("ELECTRIC",),     # 0 dmg + heals on electric moves
-    "dryskin": ("WATER",),           # 0 dmg + heals on water moves
-    "earth_eater": ("GROUND",),      # 0 dmg + heals on ground moves
+    "waterabsorb": ("WATER",),    # 0 dmg + heals on water moves
+    "voltabsorb": ("ELECTRIC",),  # 0 dmg + heals on electric moves
+    "dryskin": ("WATER",),        # 0 dmg + heals on water moves
+    "eartheater": ("GROUND",),    # 0 dmg + heals on ground moves
 }
 
 # Damage reduction/increase abilities: take less (or more) damage from specific types
@@ -128,11 +128,9 @@ _ABILITY_DAMAGE_REDUCTION = {
 }
 
 # Contact move damage modifiers: ability -> multiplier
-# Applied based on move.makes_contact / move flags, not type
+# Applied based on move.flags["contact"]
 _ABILITY_CONTACT_MOD = {
-    "fluffy": 0.5,        # Halves damage from contact moves
-    "rockyhelmet": 1.0,   # No damage modifier but recoils attacker
-    "ironbarbs": 1.0,     # Same as rocky helmet
+    "fluffy": 0.5,  # Halves damage from contact moves (only ability that modifies dmg)
 }
 
 # Super-effective resistance abilities: reduce SE damage to 0.75x
