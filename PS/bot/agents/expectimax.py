@@ -54,6 +54,21 @@ _STATUS_MOVES = {
 }
 
 
+class _EvalResult:
+    """Detailed result of move/switch evaluation for logging."""
+    def __init__(self, score: float, damage_dealt: float = 0.0, damage_taken: float = 0.0,
+                 expected_hp_after: float = 1.0, is_setup: bool = False, is_hazard: bool = False,
+                 move_category: str = "", reasoning: str = ""):
+        self.score = score
+        self.damage_dealt = damage_dealt
+        self.damage_taken = damage_taken
+        self.expected_hp_after = expected_hp_after
+        self.is_setup = is_setup
+        self.is_hazard = is_hazard
+        self.move_category = move_category
+        self.reasoning = reasoning
+
+
 class ExpectimaxAgent(Player):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -137,11 +152,44 @@ class ExpectimaxAgent(Player):
                 opp_last_action = "switch"
                 opp_prev_pokemon = self._prev_opp_pokemon
 
+        # Extract strategic context for logging
+        strategic_state = ""
+        active_threat = 0.0
+        bench_threat = 0.0
+        unknown_threat = 0.0
+        we_go_first = False
+        opp_predicted_action = ""
+        opp_predicted_damage = 0.0
+        opp_set_predictions = {}
+
+        if self._strategic_ctx:
+            strategic_state = self._strategic_ctx["state"]
+            active_threat = self._strategic_ctx["threat_breakdown"].get("active_threat", 0.0)
+            bench_threat = self._strategic_ctx["threat_breakdown"].get("bench_threat", 0.0)
+            unknown_threat = self._strategic_ctx["threat_breakdown"].get("unknown_threat", 0.0)
+            opp_predicted_action = self._strategic_ctx["predicted_action"]["action"]
+            opp_predicted_damage = self._strategic_ctx["predicted_action"]["expected_damage"]
+            we_go_first = self._we_go_first(battle) if battle.active_pokemon else False
+
+        # Get speed stages for logging
+        our_speed_stage = battle.active_pokemon.speed_boosts if battle.active_pokemon else 0
+        opp_speed_stage = battle.opponent_active_pokemon.speed_boosts if battle.opponent_active_pokemon else 0
+
         self._battle_logger.start_turn(
             battle.turn, our_pokemon, opp_pokemon, our_hp, opp_hp,
             opp_last_move=opp_last_move,
             opp_last_action=opp_last_action,
             opp_prev_pokemon=opp_prev_pokemon,
+            strategic_state=strategic_state,
+            active_threat=active_threat,
+            bench_threat=bench_threat,
+            unknown_threat=unknown_threat,
+            our_speed_stage=our_speed_stage,
+            opp_speed_stage=opp_speed_stage,
+            we_go_first=we_go_first,
+            opp_predicted_action=opp_predicted_action,
+            opp_predicted_damage=opp_predicted_damage,
+            opp_set_predictions=opp_set_predictions,
         )
         self._prev_opp_pokemon = opp_pokemon
 
@@ -185,32 +233,59 @@ class ExpectimaxAgent(Player):
             is_status = mid in _STATUS_MOVES and _STATUS_MOVES[mid] is not None
 
             if is_setup:
-                score = self._eval_setup_move(move, battle, type_chart)
+                result = self._eval_setup_move(move, battle, type_chart)
             elif is_recovery:
-                score = self._eval_recovery_move(move, battle, type_chart)
+                result = self._eval_recovery_move(move, battle, type_chart)
             elif is_hazard:
-                score = self._eval_hazard_move(move, battle, type_chart)
+                result = self._eval_hazard_move(move, battle, type_chart)
             elif is_status:
-                score = self._eval_status_move(move, battle, type_chart)
+                result = self._eval_status_move(move, battle, type_chart)
             else:
-                score = self._eval_move(move, battle, type_chart)
+                result = self._eval_move(move, battle, type_chart)
 
-            self._battle_logger.log_decision("move", move.id, score, our_hp, opp_hp, chosen=False)
-            best_move_score = max(best_move_score, score)
+            # Ensure result is _EvalResult; convert float if needed
+            if isinstance(result, float):
+                result = _EvalResult(result)
 
-            if score > best_score:
-                best_score = score
+            self._battle_logger.log_decision(
+                "move", move.id, result.score, our_hp, opp_hp, chosen=False,
+                base_score=result.score,
+                damage_dealt=result.damage_dealt,
+                damage_taken=result.damage_taken,
+                expected_hp_after=result.expected_hp_after,
+                is_setup=is_setup,
+                is_hazard=is_hazard,
+                move_category=result.move_category,
+                reasoning=result.reasoning,
+            )
+            best_move_score = max(best_move_score, result.score)
+
+            if result.score > best_score:
+                best_score = result.score
                 best_order = self.create_order(move)
                 chosen_action = ("move", move.id)
-                if is_setup and score > 0.5:
+                if is_setup and result.score > 0.5:
                     break
 
         for switch in battle.available_switches:
-            score = self._eval_switch(switch, battle, type_chart)
-            self._battle_logger.log_decision("switch", switch.species, score, our_hp, opp_hp, chosen=False)
+            result = self._eval_switch(switch, battle, type_chart)
 
-            if score > best_score:
-                best_score = score
+            # Ensure result is _EvalResult; convert float if needed
+            if isinstance(result, float):
+                result = _EvalResult(result)
+
+            self._battle_logger.log_decision(
+                "switch", switch.species, result.score, our_hp, opp_hp, chosen=False,
+                base_score=result.score,
+                damage_dealt=result.damage_dealt,
+                damage_taken=result.damage_taken,
+                expected_hp_after=result.expected_hp_after,
+                move_category="switch",
+                reasoning=result.reasoning,
+            )
+
+            if result.score > best_score:
+                best_score = result.score
                 best_order = self.create_order(switch)
                 chosen_action = ("switch", switch.species)
 
@@ -252,22 +327,32 @@ class ExpectimaxAgent(Player):
         """Get all battle logs."""
         return self._battle_logs
 
-    def _eval_move(self, move, battle, type_chart) -> float:
+    def _eval_move(self, move, battle, type_chart):
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
 
-        # Turn 0: opp lead not yet visible. Score moves by their inherent
-        # power (BP * STAB * accuracy) so we pick our strongest STAB attack.
-        # This reflects: we have no info, so commit to the best move our
-        # lead offers. Switches also score 0 here — both sides are blind.
+        # Determine move category
+        move_category = ""
         if defender is None:
+            # Turn 0: opp lead not yet visible. Score moves by their inherent
+            # power (BP * STAB * accuracy) so we pick our strongest STAB attack.
+            # This reflects: we have no info, so commit to the best move our
+            # lead offers. Switches also score 0 here — both sides are blind.
             bp = move.base_power or 0
             if bp <= 0:
-                return 0.0
+                return _EvalResult(0.0)
             stab = 1.5 if attacker and move.type in attacker.types else 1.0
             acc = _accuracy(move)
             # Normalize: a 120 BP STAB move ~= 0.36 baseline
-            return (bp * stab * acc) / 500.0
+            score = (bp * stab * acc) / 500.0
+            move_category = "status"
+            return _EvalResult(score, reasoning="Turn 0: blind lead evaluation")
+
+        # Determine move category (physical/special/status)
+        if move.base_power and move.base_power > 0:
+            move_category = "physical" if _is_physical_move(move) else "special"
+        else:
+            move_category = "status"
 
         # Read our active boosts so Swords Dance, Nasty Plot, etc. are reflected
         boosts = (attacker.boosts if attacker else None) or {}
@@ -309,7 +394,15 @@ class ExpectimaxAgent(Player):
             base_score += 0.002  # STAB tiebreaker
         base_score += our_damage * 0.001  # Damage tiebreaker
 
-        return base_score
+        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}"
+        return _EvalResult(
+            base_score,
+            damage_dealt=our_damage,
+            damage_taken=opp_damage,
+            expected_hp_after=our_after,
+            move_category=move_category,
+            reasoning=reasoning,
+        )
 
     def _best_damage_against(self, attacker, defender, battle, type_chart) -> float:
         """Best damage fraction we can deal with our currently-available moves."""
@@ -325,7 +418,7 @@ class ExpectimaxAgent(Player):
             best = max(best, d)
         return best
 
-    def _eval_setup_move(self, move, battle, type_chart) -> float:
+    def _eval_setup_move(self, move, battle, type_chart):
         """Evaluate setup moves via 2-turn virtual rollout.
 
         Turn 1: we set up, opp attacks. Turn 2: we attack with boost, opp attacks.
@@ -334,19 +427,20 @@ class ExpectimaxAgent(Player):
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
         if not attacker or not defender:
-            return float("-inf")
+            return _EvalResult(float("-inf"), reasoning="No attacker or defender")
 
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
 
         our_hp_t1 = attacker.current_hp_fraction if attacker else 1.0
         our_after_t1 = max(0.0, our_hp_t1 - opp_damage)
         if our_after_t1 <= 0.0:
-            return self._value.score_transition(battle, 0.0, defender.current_hp_fraction)
+            score = self._value.score_transition(battle, 0.0, defender.current_hp_fraction)
+            return _EvalResult(score, damage_taken=opp_damage, expected_hp_after=0.0, is_setup=True, reasoning="Setup would result in KO")
 
         atk_boost = move.boosts.get("atk", 0) if move.boosts else 0
         spa_boost = move.boosts.get("spa", 0) if move.boosts else 0
         if atk_boost <= 0 and spa_boost <= 0:
-            return float("-inf")
+            return _EvalResult(float("-inf"), is_setup=True, reasoning="No positive boosts")
 
         best_our_damage_t2 = 0.0
         for m in battle.available_moves:
@@ -383,9 +477,18 @@ class ExpectimaxAgent(Player):
             elif ctx["state"] == "DANGER":
                 score -= 0.10  # Avoid setup when threats loom
 
-        return score
+        reasoning = f"2-turn setup: +{atk_boost}atk/+{spa_boost}spa, t2_damage={best_our_damage_t2:.3f}, opp_dmg={opp_damage:.3f}"
+        return _EvalResult(
+            score,
+            damage_taken=opp_damage * 2,
+            damage_dealt=best_our_damage_t2,
+            expected_hp_after=our_after,
+            is_setup=True,
+            move_category="status",
+            reasoning=reasoning,
+        )
 
-    def _eval_recovery_move(self, move, battle, type_chart) -> float:
+    def _eval_recovery_move(self, move, battle, type_chart):
         """Evaluate recovery moves considering actual effective healing.
 
         - Caps healing at 100% HP (no wasted heal reward)
@@ -397,7 +500,7 @@ class ExpectimaxAgent(Player):
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
         if not attacker or not defender:
-            return float("-inf")
+            return _EvalResult(float("-inf"), reasoning="No attacker or defender")
 
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
         our_hp = attacker.current_hp_fraction if attacker else 1.0
@@ -415,7 +518,7 @@ class ExpectimaxAgent(Player):
 
         # Don't heal if we'd faint this turn (better to attack)
         if hp_after_damage <= 0.0:
-            return float("-inf")
+            return _EvalResult(float("-inf"), reasoning="Would faint this turn")
 
         hp_after_heal = min(1.0, hp_after_damage + hp_recovered)
 
@@ -439,9 +542,17 @@ class ExpectimaxAgent(Player):
         if (move.current_pp or 0) < _MIN_PP_PENALTY:
             pp_penalty = -0.1
 
-        return base_score + stall_bonus + pp_penalty
+        score = base_score + stall_bonus + pp_penalty
+        reasoning = f"heal={hp_recovered:.3f}, opp_dmg={opp_damage:.3f}, final_hp={hp_after_heal:.3f}"
+        return _EvalResult(
+            score,
+            damage_taken=opp_damage,
+            expected_hp_after=hp_after_heal,
+            move_category="status",
+            reasoning=reasoning,
+        )
 
-    def _eval_hazard_move(self, move, battle, type_chart) -> float:
+    def _eval_hazard_move(self, move, battle, type_chart):
         """Evaluate hazard-setting moves (Stealth Rock, Spikes, Toxic Spikes, Sticky Web).
 
         Value scales with opponent's remaining Pokemon (more switches = more value)
@@ -450,7 +561,7 @@ class ExpectimaxAgent(Player):
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
         if not attacker or not defender:
-            return float("-inf")
+            return _EvalResult(float("-inf"), reasoning="No attacker or defender")
 
         mid = _norm(move.id)
         opp_side = battle.opponent_side_conditions or {}
@@ -458,19 +569,19 @@ class ExpectimaxAgent(Player):
         # Don't re-set existing hazards
         if mid == "stealthrock":
             if _match_condition(opp_side, "stealthrock") is not None:
-                return float("-inf")
+                return _EvalResult(float("-inf"), reasoning="Stealth Rock already set")
             base_value = 0.35  # High value - works vs most mons
         elif mid == "spikes":
             existing = _match_condition(opp_side, "spikes")
             layers = opp_side.get(existing, 0) if existing else 0
             if layers >= 3:
-                return float("-inf")
+                return _EvalResult(float("-inf"), reasoning="Spikes already at max layers")
             base_value = 0.25 - layers * 0.08  # Diminishing returns
         elif mid == "toxicspikes":
             existing = _match_condition(opp_side, "toxicspikes")
             layers = opp_side.get(existing, 0) if existing else 0
             if layers >= 2:
-                return float("-inf")
+                return _EvalResult(float("-inf"), reasoning="Toxic Spikes already at max")
             # Check if opp has any revealed Poison-type (absorbs T-Spikes on switch-in)
             opp_team = battle.opponent_team or {}
             has_poison_absorber = any(
@@ -478,14 +589,14 @@ class ExpectimaxAgent(Player):
                 for p in opp_team.values()
             )
             if has_poison_absorber:
-                return float("-inf")  # Wasted turn - poison type will remove layers
+                return _EvalResult(float("-inf"), reasoning="Poison-type absorber present")
             base_value = 0.20 - layers * 0.08
         elif mid == "stickyweb":
             if _match_condition(opp_side, "stickyweb") is not None:
-                return float("-inf")
+                return _EvalResult(float("-inf"), reasoning="Sticky Web already set")
             base_value = 0.20
         else:
-            return float("-inf")
+            return _EvalResult(float("-inf"), reasoning="Unknown hazard move")
 
         # Count opp mons with HP remaining (each future switch = more value)
         opp_team = battle.opponent_team or {}
@@ -505,7 +616,7 @@ class ExpectimaxAgent(Player):
 
         # If we faint setting up, it's only worth it if we'd lose anyway
         if our_after <= 0.0 and our_hp < 0.3:
-            return float("-inf")
+            return _EvalResult(float("-inf"), reasoning="Would faint setting hazard")
 
         opp_hp = defender.current_hp_fraction if defender else 1.0
         base_score = self._value.score_transition(battle, our_after, opp_hp)
@@ -520,7 +631,16 @@ class ExpectimaxAgent(Player):
             if ctx["opp_will_switch"]:
                 value *= 1.2  # Opp switching = immediate hazard payoff
 
-        return base_score + value
+        score = base_score + value
+        reasoning = f"{mid}: opp_mons_left={opp_mons_left}, value={value:.3f}, opp_dmg={opp_damage:.3f}"
+        return _EvalResult(
+            score,
+            damage_taken=opp_damage,
+            expected_hp_after=our_after,
+            is_hazard=True,
+            move_category="status",
+            reasoning=reasoning,
+        )
 
     def _eval_status_move(self, move, battle, type_chart) -> float:
         """Evaluate status-inflicting moves (Will-O-Wisp, Toxic, Thunder Wave, etc.).
@@ -636,9 +756,17 @@ class ExpectimaxAgent(Player):
             survivability = min(2.0, max(1.0, turns_to_survive / 3.0))
             base_value *= survivability
 
-        return base_score + base_value * acc
+        score = base_score + base_value * acc
+        reasoning = f"{status_type}: acc={acc:.2f}, value={base_value * acc:.3f}, opp_dmg={opp_damage:.3f}"
+        return _EvalResult(
+            score,
+            damage_taken=opp_damage,
+            expected_hp_after=our_after,
+            move_category="status",
+            reasoning=reasoning,
+        )
 
-    def _eval_switch(self, pokemon, battle, type_chart) -> float:
+    def _eval_switch(self, pokemon, battle, type_chart):
         opp = battle.opponent_active_pokemon
         # If opp is fainted, they're sending in a fresh mon at full HP — we
         # can't claim credit for an already-dead Pokemon. Otherwise every
@@ -694,7 +822,15 @@ class ExpectimaxAgent(Player):
             if our_after <= 0.0:
                 ctx_adj -= 0.30
 
-        return base_score + offensive_bonus + info_bonus + ctx_adj
+        score = base_score + offensive_bonus + info_bonus + ctx_adj
+        reasoning = f"switch_to {pokemon.species}: hazard_dmg={hazard:.3f}, opp_dmg={opp_damage:.3f}"
+        return _EvalResult(
+            score,
+            damage_taken=opp_damage + hazard,
+            expected_hp_after=our_after,
+            move_category="switch",
+            reasoning=reasoning,
+        )
 
     def _max_bench_threat(self, battle, our_pokemon, type_chart) -> float:
         """Max damage opp's revealed bench mons can do to our switch-in.

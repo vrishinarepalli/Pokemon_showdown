@@ -20,6 +20,15 @@ class Decision:
     our_hp: float
     opp_hp: float
     chosen: bool
+    # Detailed breakdown
+    base_score: float = 0.0
+    damage_dealt: float = 0.0
+    damage_taken: float = 0.0
+    expected_hp_after: float = 0.0
+    is_setup: bool = False
+    is_hazard: bool = False
+    move_category: str = ""  # "physical", "special", "status", "switch"
+    reasoning: str = ""  # Why this action was chosen/rejected
 
 
 @dataclass
@@ -35,6 +44,17 @@ class TurnLog:
     opp_last_move: Optional[str] = None
     opp_last_action: Optional[str] = None  # "move" or "switch"
     opp_prev_pokemon: Optional[str] = None  # Their pokemon last turn (if different)
+    # Strategic context for this turn
+    strategic_state: str = ""  # "SAFE", "TRADEOFF", "DANGER"
+    active_threat: float = 0.0  # Max damage from active opponent mon
+    bench_threat: float = 0.0  # Max damage from best bench mon
+    unknown_threat: float = 0.0  # Max damage from unrevealed sets
+    our_speed_stage: int = 0  # Current speed stage for our mon
+    opp_speed_stage: int = 0  # Current speed stage for opp mon
+    we_go_first: bool = False  # Do we move first this turn?
+    opp_predicted_action: str = ""  # What we think opponent will do
+    opp_predicted_damage: float = 0.0  # Expected damage from opponent
+    opp_set_predictions: Dict[str, Any] = field(default_factory=dict)  # Remaining possible sets
 
 
 @dataclass
@@ -77,11 +97,29 @@ class BattleLog:
                     "opp_last_move": t.opp_last_move,
                     "opp_last_action": t.opp_last_action,
                     "opp_prev_pokemon": t.opp_prev_pokemon,
+                    "strategic_state": t.strategic_state,
+                    "active_threat": round(t.active_threat, 3),
+                    "bench_threat": round(t.bench_threat, 3),
+                    "unknown_threat": round(t.unknown_threat, 3),
+                    "our_speed_stage": t.our_speed_stage,
+                    "opp_speed_stage": t.opp_speed_stage,
+                    "we_go_first": t.we_go_first,
+                    "opp_predicted_action": t.opp_predicted_action,
+                    "opp_predicted_damage": round(t.opp_predicted_damage, 3),
+                    "opp_set_predictions": t.opp_set_predictions,
                     "decisions": [
                         {
                             "type": d.action_type,
                             "name": d.action_name,
                             "score": sanitize_score(d.score),
+                            "base_score": round(d.base_score, 4),
+                            "damage_dealt": round(d.damage_dealt, 3),
+                            "damage_taken": round(d.damage_taken, 3),
+                            "expected_hp_after": round(d.expected_hp_after, 3),
+                            "is_setup": d.is_setup,
+                            "is_hazard": d.is_hazard,
+                            "move_category": d.move_category,
+                            "reasoning": d.reasoning,
                             "chosen": d.chosen,
                         }
                         for d in t.decisions
@@ -115,7 +153,17 @@ class BattleLogger:
                    our_hp: float, opp_hp: float,
                    opp_last_move: Optional[str] = None,
                    opp_last_action: Optional[str] = None,
-                   opp_prev_pokemon: Optional[str] = None):
+                   opp_prev_pokemon: Optional[str] = None,
+                   strategic_state: str = "",
+                   active_threat: float = 0.0,
+                   bench_threat: float = 0.0,
+                   unknown_threat: float = 0.0,
+                   our_speed_stage: int = 0,
+                   opp_speed_stage: int = 0,
+                   we_go_first: bool = False,
+                   opp_predicted_action: str = "",
+                   opp_predicted_damage: float = 0.0,
+                   opp_set_predictions: Optional[Dict[str, Any]] = None):
         """Mark the start of a new turn."""
         self.current_turn = TurnLog(
             turn=turn,
@@ -126,10 +174,24 @@ class BattleLogger:
             opp_last_move=opp_last_move,
             opp_last_action=opp_last_action,
             opp_prev_pokemon=opp_prev_pokemon,
+            strategic_state=strategic_state,
+            active_threat=active_threat,
+            bench_threat=bench_threat,
+            unknown_threat=unknown_threat,
+            our_speed_stage=our_speed_stage,
+            opp_speed_stage=opp_speed_stage,
+            we_go_first=we_go_first,
+            opp_predicted_action=opp_predicted_action,
+            opp_predicted_damage=opp_predicted_damage,
+            opp_set_predictions=opp_set_predictions or {},
         )
 
     def log_decision(self, action_type: str, action_name: str, score: float,
-                     our_hp: float, opp_hp: float, chosen: bool = False):
+                     our_hp: float, opp_hp: float, chosen: bool = False,
+                     base_score: float = 0.0, damage_dealt: float = 0.0,
+                     damage_taken: float = 0.0, expected_hp_after: float = 0.0,
+                     is_setup: bool = False, is_hazard: bool = False,
+                     move_category: str = "", reasoning: str = ""):
         """Log a move/switch option evaluated this turn."""
         if self.current_turn is None:
             return
@@ -141,6 +203,14 @@ class BattleLogger:
             our_hp=our_hp,
             opp_hp=opp_hp,
             chosen=chosen,
+            base_score=base_score,
+            damage_dealt=damage_dealt,
+            damage_taken=damage_taken,
+            expected_hp_after=expected_hp_after,
+            is_setup=is_setup,
+            is_hazard=is_hazard,
+            move_category=move_category,
+            reasoning=reasoning,
         )
         self.current_turn.decisions.append(decision)
 
