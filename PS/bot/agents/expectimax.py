@@ -62,16 +62,37 @@ class ExpectimaxAgent(Player):
         self._battle_logger = None  # Created per battle
         self._battle_logs = []  # All completed battle logs
         self._strategic_ctx = None  # Per-turn strategic state (set in choose_move)
+        self._opp_tracker = None    # Per-battle opp set tracker (created on first turn)
 
     def choose_move(self, battle):
         announce_team(self, battle)
         type_chart = GenData.from_gen(battle.gen).type_chart
         self._opp_power_cache.clear()  # Fresh cache per turn
 
+        # Initialize per-battle opp tracker on first turn
+        if self._opp_tracker is None or self._battle_logger is None:
+            from bot.data.opp_tracker import OppTeamTracker
+            self._opp_tracker = OppTeamTracker()
+
+        # Update tracker with currently-revealed opp info each turn.
+        # Each new species = a slot; revealed moves prune possible sets.
+        opp_team = battle.opponent_team or {}
+        for opp_mon in opp_team.values():
+            if opp_mon is None:
+                continue
+            self._opp_tracker.observe_pokemon(opp_mon.species)
+            for move in opp_mon.moves.values():
+                self._opp_tracker.observe_move(opp_mon.species, move.id)
+            ability = getattr(opp_mon, "ability", None)
+            if ability:
+                self._opp_tracker.observe_ability(opp_mon.species, ability)
+
         # Compute once per turn: aggregate threat assessment + opp action prediction.
         # Used by move/switch evaluators to apply strategic context (SAFE/TRADEOFF/DANGER).
         if battle.active_pokemon is not None:
-            self._strategic_ctx = _strategic_context(battle, battle.active_pokemon, type_chart)
+            self._strategic_ctx = _strategic_context(
+                battle, battle.active_pokemon, type_chart, tracker=self._opp_tracker
+            )
         else:
             self._strategic_ctx = None
 
@@ -217,6 +238,7 @@ class ExpectimaxAgent(Player):
             self._battle_logs.append(self._battle_logger.get_log())
             self._battle_logger = None
             self._prev_opp_pokemon = None
+            self._opp_tracker = None  # Reset per-battle opp set tracker
 
     def save_battle_logs(self, filename: str):
         """Save all battle logs to a JSON file."""
@@ -687,7 +709,7 @@ class ExpectimaxAgent(Player):
                 continue
             if active is not None and opp_mon.species == active.species:
                 continue
-            threat = _max_threat_via_movepool(opp_mon, our_pokemon, type_chart)
+            threat = _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=self._opp_tracker)
             best = max(best, threat)
         return best
 
@@ -700,11 +722,15 @@ class ExpectimaxAgent(Player):
         """
         if not opp or not our_pokemon:
             return 0.0
-        key = (id(opp), id(our_pokemon))
+        # Cache key uses species (stable across switch-in/out) — id() can be reused.
+        key = (
+            getattr(opp, "species", None) or id(opp),
+            getattr(our_pokemon, "species", None) or id(our_pokemon),
+        )
         if key not in self._opp_power_cache:
             # Use revealed moves first, fall back to movepool for unrevealed slots
             best_revealed = _max_opp_damage_fraction(opp, our_pokemon, type_chart)
-            best_with_pool = _max_threat_via_movepool(opp, our_pokemon, type_chart)
+            best_with_pool = _max_threat_via_movepool(opp, our_pokemon, type_chart, tracker=self._opp_tracker)
             self._opp_power_cache[key] = max(best_revealed, best_with_pool)
         return self._opp_power_cache[key]
 
@@ -891,7 +917,7 @@ def _estimate_opp_switch_probability(opp_damage_to_us: float, our_best_damage: f
     return 0.0
 
 
-def _predict_opp_switch_in(battle, our_active, type_chart):
+def _predict_opp_switch_in(battle, our_active, type_chart, tracker=None):
     """Predict which Pokemon opp would switch to, given M3's heuristic.
 
     M3 picks the bench mon with max (offense - defense_penalty) vs our active.
@@ -918,7 +944,7 @@ def _predict_opp_switch_in(battle, our_active, type_chart):
             continue
 
         # Estimate offense: max damage opp_mon can do to our active
-        offense = _max_threat_via_movepool(opp_mon, our_active, type_chart)
+        offense = _max_threat_via_movepool(opp_mon, our_active, type_chart, tracker=tracker)
 
         # Defense penalty: how much our active threatens opp_mon
         defense_penalty = 0.0
@@ -981,7 +1007,7 @@ def _unknown_mon_threat(our_pokemon) -> float:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def _compute_opp_max_threat(battle, our_pokemon, type_chart):
+def _compute_opp_max_threat(battle, our_pokemon, type_chart, tracker=None):
     """Aggregate max damage opp can deal to our_pokemon across their entire team.
 
     Considers:
@@ -1006,7 +1032,7 @@ def _compute_opp_max_threat(battle, our_pokemon, type_chart):
     active_threat = 0.0
     active_species = None
     if active is not None and not active.fainted:
-        active_threat = _max_threat_via_movepool(active, our_pokemon, type_chart)
+        active_threat = _max_threat_via_movepool(active, our_pokemon, type_chart, tracker=tracker)
         active_species = active.species
 
     # Bench threats (revealed but not active)
@@ -1017,7 +1043,7 @@ def _compute_opp_max_threat(battle, our_pokemon, type_chart):
             continue
         if active is not None and opp_mon.species == active.species:
             continue
-        threat = _max_threat_via_movepool(opp_mon, our_pokemon, type_chart)
+        threat = _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=tracker)
         if threat > bench_threat:
             bench_threat = threat
             bench_species = opp_mon.species
@@ -1045,7 +1071,7 @@ def _compute_opp_max_threat(battle, our_pokemon, type_chart):
     }
 
 
-def _predict_opp_action(battle, our_pokemon, type_chart):
+def _predict_opp_action(battle, our_pokemon, type_chart, tracker=None):
     """Predict M3-style opponent's action this turn.
 
     M3's logic (from heuristic.py):
@@ -1060,12 +1086,12 @@ def _predict_opp_action(battle, our_pokemon, type_chart):
     active = battle.opponent_active_pokemon
     if active is None or active.fainted:
         # Forced switch (active fainted)
-        target = _predict_opp_switch_in(battle, our_pokemon, type_chart)
+        target = _predict_opp_switch_in(battle, our_pokemon, type_chart, tracker=tracker)
         target_species = target.species if target else None
-        target_damage = _max_threat_via_movepool(target, our_pokemon, type_chart) if target else 0.0
+        target_damage = _max_threat_via_movepool(target, our_pokemon, type_chart, tracker=tracker) if target else 0.0
         return {"action": "switch", "target": target_species, "expected_damage": target_damage}
 
-    active_damage = _max_threat_via_movepool(active, our_pokemon, type_chart)
+    active_damage = _max_threat_via_movepool(active, our_pokemon, type_chart, tracker=tracker)
 
     # Use existing M3 switch probability to decide stay vs switch
     info_deficit = _info_deficit(battle)
@@ -1073,9 +1099,9 @@ def _predict_opp_action(battle, our_pokemon, type_chart):
     switch_prob = _estimate_opp_switch_probability(active_damage, our_best, info_deficit)
 
     if switch_prob >= 0.5:
-        target = _predict_opp_switch_in(battle, our_pokemon, type_chart)
+        target = _predict_opp_switch_in(battle, our_pokemon, type_chart, tracker=tracker)
         if target is not None:
-            target_damage = _max_threat_via_movepool(target, our_pokemon, type_chart)
+            target_damage = _max_threat_via_movepool(target, our_pokemon, type_chart, tracker=tracker)
             return {"action": "switch", "target": target.species, "expected_damage": target_damage}
 
     return {"action": "attack", "target": None, "expected_damage": active_damage}
@@ -1086,7 +1112,7 @@ _THREAT_SAFE = 0.33    # below this: we can setup/attack freely
 _THREAT_DANGER = 0.50  # above this: we should consider defensive play
 
 
-def _strategic_context(battle, our_pokemon, type_chart):
+def _strategic_context(battle, our_pokemon, type_chart, tracker=None):
     """Classify the current matchup state and predict opp behavior.
 
     Returns dict:
@@ -1096,8 +1122,8 @@ def _strategic_context(battle, our_pokemon, type_chart):
       - threat_breakdown: dict from _compute_opp_max_threat
       - predicted_action: dict from _predict_opp_action
     """
-    threat = _compute_opp_max_threat(battle, our_pokemon, type_chart)
-    action = _predict_opp_action(battle, our_pokemon, type_chart)
+    threat = _compute_opp_max_threat(battle, our_pokemon, type_chart, tracker=tracker)
+    action = _predict_opp_action(battle, our_pokemon, type_chart, tracker=tracker)
 
     if threat["max_damage"] < _THREAT_SAFE:
         state = "SAFE"
@@ -1115,12 +1141,15 @@ def _strategic_context(battle, our_pokemon, type_chart):
     }
 
 
-def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart) -> float:
+def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=None) -> float:
     """Estimate opp_mon's max damage to us, using sets DB for unrevealed moves.
 
     Uses revealed moves first; if fewer than 4 are revealed, fills in from
     the species' randbat movepool (we don't know their exact 4, but we know
     the pool of possibilities).
+
+    If a tracker is provided, uses the pruned movepool (filtered by observations)
+    instead of the full sets DB. This narrows predictions as the battle progresses.
     """
     from poke_env.battle.move import Move
     from bot.data.sets_db import get_movepool
@@ -1137,9 +1166,14 @@ def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart) -> float:
             d = _damage_fraction(m, opp_mon, our_pokemon, type_chart)
             best = max(best, d)
 
-    # Fill in unknown slots from movepool
+    # Fill in unknown slots from movepool. Prefer tracker's pruned pool if available.
     if len(revealed) < 4:
-        movepool = get_movepool(opp_mon.species)
+        if tracker is not None:
+            movepool = tracker.get_likely_moves(opp_mon.species)
+            if not movepool:  # Tracker may return empty if all sets pruned
+                movepool = get_movepool(opp_mon.species)
+        else:
+            movepool = get_movepool(opp_mon.species)
         for move_id in movepool:
             if move_id in revealed:
                 continue
