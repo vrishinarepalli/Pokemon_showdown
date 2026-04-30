@@ -30,7 +30,7 @@ _SPIKES_DAMAGE = {1: 1 / 8, 2: 1 / 6, 3: 1 / 4}
 # Used to evaluate setup moves via multi-turn rollout.
 _RECOVERY_MOVES = {
     "recover", "roost", "slackoff", "milkdrink", "softboiled",
-    "morningsun", "synthesis", "moonlight", "shoreupshoreupshorenup", "wish"
+    "morningsun", "synthesis", "moonlight", "shoreup", "wish"
 }
 _MIN_PP_PENALTY = 3  # Penalize moves with less than this much PP remaining
 
@@ -144,7 +144,13 @@ class ExpectimaxAgent(Player):
                 continue
 
             mid = _norm(move.id)
-            is_setup = move.boosts and any(move.boosts.values()) and (move.base_power or 0) == 0
+            # Only POSITIVE boosts count as setup; Memento/Parting Shot/etc.
+            # have negative boosts and shouldn't run a 2-turn setup rollout.
+            is_setup = (
+                move.boosts
+                and any(v > 0 for v in move.boosts.values())
+                and (move.base_power or 0) == 0
+            )
             is_recovery = mid in _RECOVERY_MOVES
             is_hazard = mid in _HAZARD_MOVES
             is_status = mid in _STATUS_MOVES and _STATUS_MOVES[mid] is not None
@@ -244,7 +250,7 @@ class ExpectimaxAgent(Player):
         our_hp = attacker.current_hp_fraction if attacker else 1.0
         opp_hp = defender.current_hp_fraction if defender else 1.0
 
-        if _we_go_first(move, attacker, defender):
+        if _we_go_first(move, attacker, defender, battle):
             opp_after = max(0.0, opp_hp - our_damage)
             our_after = max(0.0, our_hp - (opp_damage if opp_after > 0.0 else 0.0))
         else:
@@ -344,6 +350,7 @@ class ExpectimaxAgent(Player):
         """Evaluate recovery moves considering actual effective healing.
 
         - Caps healing at 100% HP (no wasted heal reward)
+        - Handles delayed healing (Wish): penalizes since healing isn't instant
         - Adds Leftovers passive heal (+1/16 per turn) if held
         - Rewards net-positive healing (heal > damage taken = stall win)
         - Skip healing if we'd faint this turn (use attack instead)
@@ -359,6 +366,10 @@ class ExpectimaxAgent(Player):
 
         # Raw heal amount (most recovery moves = 0.5)
         hp_recovered = float(move.heal) if move.heal else 0.5
+
+        # Wish is delayed healing — only 1/8 effective this turn (we may switch/faint)
+        if _norm(move.id) == "wish":
+            hp_recovered *= 0.125
 
         # Compute HP state: take damage first, then heal, then leftovers
         hp_after_damage = max(0.0, our_hp - opp_damage)
@@ -704,14 +715,25 @@ def _opp_power_vs(opp, our_pokemon, type_chart) -> float:
     return best
 
 
-def _we_go_first(move, attacker, defender) -> bool:
+def _we_go_first(move, attacker, defender, battle=None) -> bool:
     if move.priority > 0:
         return True
     if move.priority < 0:
         return False
-    return _effective_speed(attacker, use_actual=True) >= _effective_speed(
-        defender, use_actual=False
-    )
+    our_speed = _effective_speed(attacker, use_actual=True)
+    opp_speed = _effective_speed(defender, use_actual=False)
+    # Trick Room reverses turn order at priority 0
+    if battle is not None and _trick_room_active(battle):
+        return our_speed <= opp_speed
+    return our_speed >= opp_speed
+
+
+def _trick_room_active(battle) -> bool:
+    try:
+        from poke_env.battle.field import Field
+        return Field.TRICK_ROOM in (battle.fields or {})
+    except Exception:
+        return False
 
 
 def _effective_speed(pokemon, use_actual: bool) -> float:
@@ -723,10 +745,15 @@ def _effective_speed(pokemon, use_actual: bool) -> float:
         base_spe = (pokemon.base_stats or {}).get("spe") or 100
         level = getattr(pokemon, "level", None) or 80
         base = _estimate_actual_speed(base_spe, level)
-    stage = (pokemon.boosts or {}).get("spe", 0)
-    if stage >= 0:
-        return base * (2 + stage) / 2.0
-    return base * 2.0 / (2 - stage)
+    speed = base * _stage_to_multiplier((pokemon.boosts or {}).get("spe", 0))
+    # Paralysis: 50% Speed in Gen 9 (was 25% pre-Gen 7).
+    try:
+        from poke_env.battle.status import Status
+        if getattr(pokemon, "status", None) == Status.PAR:
+            speed *= 0.5
+    except Exception:
+        pass
+    return speed
 
 
 def _estimate_actual_speed(base_stat: int, level: int) -> float:
@@ -1066,7 +1093,9 @@ def _estimate_stat(pokemon, stat_name: str) -> int:
 def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -> float:
     """Estimate damage as fraction of defender's HP using real Gen 9 formula.
 
-    atk_boost: stage count to apply to attacker's attack stat (for setup rollouts).
+    atk_boost: stage count to apply to attacker's attack stat (for setup rollouts
+    where we're projecting future state). Defender's current defensive boost
+    is read automatically from defender.boosts.
     Returns fraction in [0, 1+] (may exceed 1 for OHKOs).
     """
     bp = move.base_power or 0
@@ -1082,10 +1111,15 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
     D = _estimate_stat(defender, def_name)
     hp = _estimate_hp(defender)
 
-    if atk_boost > 0:
+    if atk_boost != 0:
         A = int(A * _stage_to_multiplier(atk_boost))
-    elif atk_boost < 0:
-        A = int(A * 2 / (2 - atk_boost))
+
+    # Apply defender's current defensive boost/drop. Critical for cases like
+    # Shell Smash (-1 Def/SpD) where the user becomes more vulnerable, or
+    # Iron Defense / Calm Mind / Cosmic Power where they become tankier.
+    def_boost = (defender.boosts or {}).get(def_name, 0)
+    if def_boost != 0:
+        D = max(1, int(D * _stage_to_multiplier(def_boost)))
 
     stab = 1.5 if move.type in attacker.types else 1.0
     eff = move.type.damage_multiplier(defender.type_1, defender.type_2, type_chart=type_chart)
@@ -1158,10 +1192,16 @@ def _setup_boost_multiplier(move, attacker) -> float:
 
 
 def _stage_to_multiplier(stage: int) -> float:
-    """Convert stat stage to damage multiplier. +1→1.5, +2→2.0, +3→2.5, etc."""
-    if stage <= 0:
-        return 1.0
-    return 1.0 + stage * 0.5
+    """Convert stat stage to multiplier (Gen 9 formula).
+
+    Positive: (2 + stage) / 2  →  +1=1.5, +2=2.0, +3=2.5
+    Negative: 2 / (2 - stage)  →  -1=0.667, -2=0.5, -3=0.4
+    Clamped to ±6 (game limit).
+    """
+    stage = max(-6, min(6, stage))
+    if stage >= 0:
+        return (2 + stage) / 2.0
+    return 2.0 / (2 - stage)
 
 
 def _switch_offensive_bonus(pokemon, opp, type_chart) -> float:

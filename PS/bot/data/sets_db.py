@@ -60,11 +60,19 @@ def get_movepool(species: str) -> Set[str]:
     # Try direct match
     entry = sets.get(norm)
     if entry is None:
-        # Try without form suffix (sinistchamasterpiece → sinistcha)
+        # Try without form suffix (sinistchamasterpiece → sinistcha).
+        # Only allow stripping FROM the input down to a shorter key — never
+        # match a shorter input to a longer key. That bidirectional matching
+        # would wrongly classify "tauros" as "taurospaldeacombat".
+        # Pick the LONGEST matching prefix so e.g. "taurospaldeacombat" finds
+        # "taurospaldeacombat" before falling back to "tauros".
+        best_key = None
         for key in sets:
-            if norm.startswith(key) or key.startswith(norm):
-                entry = sets[key]
-                break
+            if norm.startswith(key):
+                if best_key is None or len(key) > len(best_key):
+                    best_key = key
+        if best_key is not None:
+            entry = sets[best_key]
 
     if entry is None or "sets" not in entry:
         _movepool_cache[species] = set()
