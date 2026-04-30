@@ -589,13 +589,23 @@ class ExpectimaxAgent(Player):
         base_score = self._value.score_transition(battle, our_after, opp_after)
 
         # Early-game caution: penalize aggressive attacks when we don't know opp's team.
-        # M3 switches aggressively to counter our reveals, so taking heavy damage
-        # early invites a punish with a counter we haven't seen yet.
+        # BUT: Don't penalize if we have a clear advantage (high damage, STAB, type coverage).
+        # Type advantage moves should never be penalized for being risky.
         info_deficit = _info_deficit(battle)
         if info_deficit > 0.3 and our_after < 0.55:
-            # Risky play when we have limited information about opp team
-            risk_penalty = info_deficit * (0.55 - our_after) * 0.6
-            base_score -= risk_penalty
+            # Only apply risk penalty if we don't have clear damage advantage
+            # If we're dealing decent damage (>0.3) relative to opponent, it's not risky
+            damage_ratio = our_damage / max(opp_damage, 0.01) if opp_damage > 0 else 1.0
+
+            # Don't penalize if: (1) we go first and damage is significant, or
+            # (2) our damage is much higher than theirs (winning the trade)
+            goes_first = _we_go_first(move, attacker, defender, battle)
+            is_clearly_winning = our_damage > 0.3 and (goes_first or damage_ratio > 1.5)
+
+            if not is_clearly_winning:
+                # Risky play when we have limited information about opp team
+                risk_penalty = info_deficit * (0.55 - our_after) * 0.6
+                base_score -= risk_penalty
 
         # Tiebreakers (small bonuses, won't affect non-tied decisions):
         # 1. Prefer STAB moves (more reliable damage, harder to resist)
@@ -639,7 +649,20 @@ class ExpectimaxAgent(Player):
         if not attacker or not defender:
             return _EvalResult(float("-inf"), reasoning="No attacker or defender")
 
+        # CRITICAL: Never setup when we're weak to opponent's type.
+        # Check if opponent's type is super-effective against our types.
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
+
+        # Check type advantage: for each opponent type, see if moves of that type
+        # are super-effective against us.
+        for opp_type_name in [defender.type_1, defender.type_2]:
+            if opp_type_name:
+                opp_type = getattr(type_chart, opp_type_name.lower(), None) or opp_type_name
+                if hasattr(opp_type, 'damage_multiplier'):
+                    dmg_mult = opp_type.damage_multiplier(attacker.type_1, attacker.type_2, type_chart=type_chart)
+                    # If opponent's type is 2x effective or higher against us, setup is risky
+                    if dmg_mult >= 2.0:
+                        return _EvalResult(float("-inf"), is_setup=True, reasoning=f"We're weak to {opp_type_name} (opponent's type), cannot setup safely")
 
         our_hp_t1 = attacker.current_hp_fraction if attacker else 1.0
         our_after_t1 = max(0.0, our_hp_t1 - opp_damage)
@@ -978,6 +1001,19 @@ class ExpectimaxAgent(Player):
 
     def _eval_switch(self, pokemon, battle, type_chart):
         opp = battle.opponent_active_pokemon
+
+        # CRITICAL: Never switch into a type that opponent is super-effective against.
+        # If opponent's type is 2x+ effective against our switch-in, this is a terrible idea.
+        if opp is not None:
+            for opp_type_name in [opp.type_1, opp.type_2]:
+                if opp_type_name:
+                    opp_type = getattr(type_chart, opp_type_name.lower(), None) or opp_type_name
+                    if hasattr(opp_type, 'damage_multiplier'):
+                        dmg_mult = opp_type.damage_multiplier(pokemon.type_1, pokemon.type_2, type_chart=type_chart)
+                        # If opponent's type is 2x+ effective against our switch-in, heavily penalize
+                        if dmg_mult >= 2.0:
+                            return _EvalResult(float("-inf"), reasoning=f"Switch target {pokemon.species} is weak to {opp_type_name}")
+
         # If opp is fainted, they're sending in a fresh mon at full HP — we
         # can't claim credit for an already-dead Pokemon. Otherwise every
         # switch would score +1.0 (free KO bonus) and we'd pivot needlessly.
@@ -1307,6 +1343,11 @@ def _estimate_opp_switch_probability(opp_damage_to_us: float, our_best_damage: f
     # Strong signal: we're effectively immune. M3 will almost certainly swap.
     if opp_damage_to_us <= 0.03:
         return 0.75
+
+    # CRITICAL: If opponent can OHKO us, they will NEVER switch.
+    # They have a winning position so they'll stay and attack.
+    if opp_damage_to_us >= 1.0:
+        return 0.0
 
     # Otherwise M3 stays in — its switch threshold is too strict.
     return 0.0
