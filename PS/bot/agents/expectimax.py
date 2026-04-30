@@ -83,51 +83,101 @@ def _mon_value(pokemon) -> float:
     return hp * (base_speed / 200.0)
 
 
-# Abilities that provide immunity, healing, or damage reduction to specific move types
-_ABILITY_IMMUNITIES = {
-    "waterabsorb": "water",      # Immune to water, heals on hit
-    "voltabsorb": "electric",    # Immune to electric, heals on hit
-    "flashfire": "fire",         # Immune to fire, boost on hit
-    "sapsipper": "grass",        # Immune to grass, atk boost on hit
-    "dryskincalm": "water",      # Takes 1/8 damage from water (vs 2x), heals
+# Type immunity abilities: defender takes 0 damage from this move type
+# (no healing, just immune)
+_ABILITY_TYPE_IMMUNITY = {
+    "flashfire": "FIRE",        # Immune to fire, boosts fire moves on hit
+    "sapsipper": "GRASS",       # Immune to grass, +1 atk on hit
+    "levitate": "GROUND",       # Immune to ground moves
+    "motordrive": "ELECTRIC",   # Immune to electric, +1 speed on hit
+    "wonderguard": "*",         # Only super-effective hits work
 }
 
+# Healing abilities: defender heals 25% HP instead of taking damage (0 damage)
 _ABILITY_HEALING = {
-    "waterabsorb": ("water",),    # Heals on water move
-    "voltabsorb": ("electric",),  # Heals on electric move
-    "dryskin": ("water",),        # Heals on water move (but takes 1/8 damage)
+    "waterabsorb": ("WATER",),       # 0 dmg + heals on water moves
+    "voltabsorb": ("ELECTRIC",),     # 0 dmg + heals on electric moves
+    "dryskin": ("WATER",),           # 0 dmg + heals on water moves (NOT reduced damage)
+    "stormdrain": ("WATER",),        # 0 dmg + redirects water
+    "lightningrod": ("ELECTRIC",),   # 0 dmg + redirects electric
+    "earth_eater": ("GROUND",),      # 0 dmg + heals on ground moves
 }
 
+# Damage reduction/increase abilities: take less (or more) damage from specific types
+# Format: ability -> {move_type: multiplier}
 _ABILITY_DAMAGE_REDUCTION = {
-    "dryskin": {
-        "water": 0.125,  # Takes 1/8 damage instead of normal
+    "thickfat": {
+        "FIRE": 0.5,    # Halves fire damage
+        "ICE": 0.5,     # Halves ice damage
     },
-    "wonderguard": None,  # Super-tanky (only weak hits through)
+    "heatproof": {
+        "FIRE": 0.5,    # Halves fire damage
+    },
+    "waterbubble": {
+        "FIRE": 0.5,    # Halves fire damage (offensive: doubles water)
+    },
+    "dryskin": {
+        "FIRE": 1.25,   # Dry Skin takes 25% MORE from fire (already heals on water)
+    },
+    "fluffy": {
+        "FIRE": 2.0,    # Fluffy: takes 2x fire damage (halves contact - separate)
+    },
+    "purifyingsalt": {
+        "GHOST": 0.5,   # Halves ghost damage + status immunity
+    },
+}
+
+# Super-effective resistance abilities: reduce SE damage to 0.75x
+_ABILITY_SE_RESIST = {
+    "solidrock", "filter", "prismarmor",
+}
+
+# Multi-hit resistance abilities (less common in randbats but include for completeness)
+_ABILITY_MULTI_HIT_REDUCE = {
+    "shieldsdown",   # Minior in meteor form (status/secondary blocking)
 }
 
 
-def _check_ability_matchup(defender, move_type) -> tuple:
+def _check_ability_matchup(defender, move_type, type_eff: float = 1.0) -> tuple:
     """Check if defender's ability affects damage from this move type.
 
     Returns (damage_multiplier, heals) where:
-    - damage_multiplier: 0.0 = immune, 0.125 = 1/8 damage, 1.0 = normal, etc.
+    - damage_multiplier: 0.0 = immune, 0.5 = halved, 1.0 = normal, etc.
     - heals: True if the defender heals instead of taking damage
+
+    type_eff: type effectiveness (passed in to handle abilities like Solid Rock
+    that only reduce super-effective damage).
     """
     ability = _norm(getattr(defender, "ability", None))
     if not ability:
         return (1.0, False)
 
-    # Check immunity + healing (Water Absorb, Volt Absorb)
-    if ability in _ABILITY_HEALING:
-        ability_types = _ABILITY_HEALING[ability]
-        if move_type in ability_types:
-            return (0.0, True)  # Immune and heals
+    # Get the move type as a string (poke-env types have a 'name' attribute)
+    type_name = getattr(move_type, "name", str(move_type)).upper()
 
-    # Check damage reduction (Dry Skin on water)
+    # Healing abilities: 0 damage + heals 25% HP
+    if ability in _ABILITY_HEALING:
+        if type_name in _ABILITY_HEALING[ability]:
+            return (0.0, True)
+
+    # Type immunity (no healing)
+    if ability in _ABILITY_TYPE_IMMUNITY:
+        immune_type = _ABILITY_TYPE_IMMUNITY[ability]
+        if immune_type == type_name or immune_type == "*":
+            # Wonder Guard: only SE damage gets through
+            if ability == "wonderguard" and type_eff > 1.0:
+                return (1.0, False)
+            return (0.0, False)
+
+    # Damage reduction abilities (Thick Fat, Heatproof)
     if ability in _ABILITY_DAMAGE_REDUCTION:
         reductions = _ABILITY_DAMAGE_REDUCTION[ability]
-        if move_type in reductions:
-            return (reductions[move_type], False)
+        if type_name in reductions:
+            return (reductions[type_name], False)
+
+    # Super-effective resistance (Solid Rock, Filter, Prism Armor)
+    if ability in _ABILITY_SE_RESIST and type_eff > 1.0:
+        return (0.75, False)
 
     return (1.0, False)
 
@@ -909,9 +959,17 @@ class ExpectimaxAgent(Player):
                     best_bp = bp
                     best_move = move
             if best_move:
-                ability_mult, heals = _check_ability_matchup(pokemon, best_move.type)
+                # Compute type effectiveness for this move vs the switch-in pokemon
+                eff = best_move.type.damage_multiplier(
+                    pokemon.type_1, pokemon.type_2, type_chart=type_chart
+                )
+                ability_mult, heals = _check_ability_matchup(
+                    pokemon, best_move.type, type_eff=eff
+                )
                 if heals:
                     ability_bonus = 0.25  # Huge bonus: we heal from their move
+                elif ability_mult == 0.0:
+                    ability_bonus = 0.20  # Big bonus: type immunity (Levitate, Flash Fire)
                 elif ability_mult < 1.0:
                     ability_bonus = 0.10  # Minor bonus: damage reduction
 
@@ -1633,8 +1691,8 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
 
     # Ability interactions: immunity, healing, damage reduction
     # E.g., Water Absorb on water moves = 0 damage + heal
-    # E.g., Dry Skin on water = 1/8 damage instead of normal
-    ability_mult, heals = _check_ability_matchup(defender, move.type)
+    # E.g., Solid Rock = 0.75x super-effective damage (needs eff)
+    ability_mult, heals = _check_ability_matchup(defender, move.type, type_eff=eff)
 
     if heals:
         # Defender heals: effectively 0 damage (actually benefits them)
