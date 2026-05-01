@@ -382,9 +382,9 @@ class ExpectimaxAgent(Player):
             else:
                 we_go_first = False
 
-        # Get speed stages for logging
-        our_speed_stage = battle.active_pokemon.speed_boosts if battle.active_pokemon else 0
-        opp_speed_stage = battle.opponent_active_pokemon.speed_boosts if battle.opponent_active_pokemon else 0
+        # Get speed stages for logging (boosts dict uses "spe" key)
+        our_speed_stage = (battle.active_pokemon.boosts or {}).get("spe", 0) if battle.active_pokemon else 0
+        opp_speed_stage = (battle.opponent_active_pokemon.boosts or {}).get("spe", 0) if battle.opponent_active_pokemon else 0
 
         self._battle_logger.start_turn(
             battle.turn, our_pokemon, opp_pokemon, our_hp, opp_hp,
