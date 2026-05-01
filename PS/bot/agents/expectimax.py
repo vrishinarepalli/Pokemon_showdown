@@ -631,6 +631,28 @@ class ExpectimaxAgent(Player):
             # Guaranteed KO — opponent can't attack back, clearing the board is huge
             ko_bonus = 0.30
 
+        # Doomed-mon bonus: if our active mon will die regardless this turn (opp goes
+        # first AND opp_damage >= our_hp), then dying-while-dealing-damage is strictly
+        # better than switching out a still-alive but doomed mon. Reward priority moves
+        # / any damage we can squeeze out of our active mon before fainting.
+        # Without this, switching to a "fresh" mon scores higher even though that mon
+        # also can't beat the opponent — wasting the dying mon's free attack.
+        doomed_bonus = 0.0
+        goes_first = _we_go_first(move, attacker, defender, battle)
+        is_doomed = (not goes_first) and opp_damage >= our_hp and our_hp > 0
+        if is_doomed and our_damage > 0:
+            # Active mon is doomed; if this move has priority, we DO get a hit in.
+            # Damage dealt before dying is bonus value (opp loses HP, we lose nothing extra).
+            move_priority = getattr(move, "priority", 0) or 0
+            if move_priority > 0:
+                # Priority move sneaks in damage before fainting — high value
+                doomed_bonus = 0.25 + our_damage * 0.20
+            else:
+                # Non-priority move: we die without dealing damage, but staying in
+                # at least doesn't waste a different mon's HP on the switch-in.
+                # Small bonus so we don't over-prefer switching to a sacrificial pivot.
+                doomed_bonus = 0.05
+
         # Tiebreakers (small bonuses, won't affect non-tied decisions):
         # 1. Prefer STAB moves (more reliable damage, harder to resist)
         # 2. Prefer higher raw damage (overkill = safety vs miscalculation)
@@ -638,9 +660,9 @@ class ExpectimaxAgent(Player):
             base_score += 0.002  # STAB tiebreaker
         base_score += our_damage * 0.001  # Damage tiebreaker
 
-        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}, ko_bonus={ko_bonus:.3f}"
+        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}, ko_bonus={ko_bonus:.3f}, doomed_bonus={doomed_bonus:.3f}"
         return _EvalResult(
-            base_score + ko_bonus,
+            base_score + ko_bonus + doomed_bonus,
             damage_dealt=our_damage,
             damage_taken=opp_damage,
             expected_hp_after=our_after,
@@ -710,8 +732,10 @@ class ExpectimaxAgent(Player):
         our_hp_t1 = attacker.current_hp_fraction if attacker else 1.0
         our_after_t1 = max(0.0, our_hp_t1 - opp_damage)
         if our_after_t1 <= 0.0:
-            score = self._value.score_transition(battle, 0.0, defender.current_hp_fraction)
-            return _EvalResult(score, damage_taken=opp_damage, expected_hp_after=0.0, is_setup=True, reasoning="Setup would result in KO")
+            # Setup with no payoff: we faint without using the boost. Strictly worse
+            # than any damaging move (which at least might land if we have priority
+            # or speed). Return -inf so we never set up while in KO range.
+            return _EvalResult(float("-inf"), damage_taken=opp_damage, expected_hp_after=0.0, is_setup=True, reasoning="Setup would result in KO — boost is wasted on faint")
 
         atk_boost = move.boosts.get("atk", 0) if move.boosts else 0
         spa_boost = move.boosts.get("spa", 0) if move.boosts else 0
@@ -1334,12 +1358,19 @@ def _trick_room_active(battle) -> bool:
 def _effective_speed(pokemon, use_actual: bool) -> float:
     if pokemon is None:
         return 100.0
+    # Always compute the level-based estimate as a sanity floor — random battles
+    # use max-EV speed for any mon expected to be fast (96+ base spe runs 252).
+    # Without this floor, poke_env's reported pokemon.stats can be 0/None for
+    # newly-revealed mons, making us think we're slower than we actually are.
+    base_spe = (pokemon.base_stats or {}).get("spe") or 100
+    level = getattr(pokemon, "level", None) or 80
+    estimated = _estimate_actual_speed(base_spe, level)
     if use_actual and pokemon.stats and pokemon.stats.get("spe"):
-        base = pokemon.stats["spe"]
+        # Use the larger of actual stat vs estimate. For our mon, actual is
+        # usually correct, but if it's missing/zero we shouldn't assume we're slow.
+        base = max(pokemon.stats["spe"], estimated)
     else:
-        base_spe = (pokemon.base_stats or {}).get("spe") or 100
-        level = getattr(pokemon, "level", None) or 80
-        base = _estimate_actual_speed(base_spe, level)
+        base = estimated
     speed = base * _stage_to_multiplier((pokemon.boosts or {}).get("spe", 0))
     # Paralysis: 50% Speed in Gen 9 (was 25% pre-Gen 7).
     try:
