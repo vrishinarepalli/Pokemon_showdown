@@ -1601,10 +1601,16 @@ def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=None) -> 
     revealed = {m.id for m in opp_mon.moves.values()}
     best = 0.0
 
+    # Apply opp's current offensive boosts/drops. Critical for moves like
+    # Draco Meteor / Overheat / Leaf Storm that self-drop SpA: the next turn,
+    # all the opponent's special moves are at -2 SpA and hit far less.
+    opp_boosts = opp_mon.boosts or {}
+
     # Revealed damaging moves
     for m in opp_mon.moves.values():
         if (m.base_power or 0) > 0:
-            d = _damage_fraction(m, opp_mon, our_pokemon, type_chart)
+            boost = opp_boosts.get("atk" if _is_physical_move(m) else "spa", 0)
+            d = _damage_fraction(m, opp_mon, our_pokemon, type_chart, atk_boost=boost)
             best = max(best, d)
 
     # Fill in unknown slots from movepool. Prefer tracker's pruned pool if available.
@@ -1625,7 +1631,8 @@ def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=None) -> 
             if (m.base_power or 0) <= 0:
                 continue
             try:
-                d = _damage_fraction(m, opp_mon, our_pokemon, type_chart)
+                boost = opp_boosts.get("atk" if _is_physical_move(m) else "spa", 0)
+                d = _damage_fraction(m, opp_mon, our_pokemon, type_chart, atk_boost=boost)
                 best = max(best, d)
             except Exception:
                 continue
@@ -1752,12 +1759,49 @@ def _estimate_stat(pokemon, stat_name: str) -> int:
     return int((2 * base + 52) * level / 100) + 5
 
 
+def _ability_status_multiplier(attacker, is_physical: bool, move_id: str = "") -> float:
+    """Multiplier on attacker's offensive stat from ability + status interactions.
+
+    - Guts + (BRN/PAR/PSN/TOX): Atk × 1.5, ignores burn Atk halving
+    - Toxic Boost + (PSN/TOX): physical Atk × 1.5
+    - Flare Boost + BRN: special SpA × 1.5
+    - Burned physical attacker (no Guts, not Facade): Atk × 0.5
+    """
+    if attacker is None:
+        return 1.0
+    ability = (getattr(attacker, "ability", "") or "").lower().replace(" ", "").replace("-", "")
+    status = getattr(attacker, "status", None)
+    status_name = getattr(status, "name", "") if status else ""
+
+    is_burned = status_name == "BRN"
+    is_poisoned = status_name in ("PSN", "TOX")
+    is_paralyzed = status_name == "PAR"
+    has_status = is_burned or is_poisoned or is_paralyzed
+
+    mult = 1.0
+
+    # Status-loving abilities
+    if ability == "guts" and has_status:
+        mult *= 1.5
+    elif ability == "toxicboost" and is_poisoned and is_physical:
+        mult *= 1.5
+    elif ability == "flareboost" and is_burned and not is_physical:
+        mult *= 1.5
+    # Burn penalty for physical attackers without Guts (Facade ignores it too)
+    elif is_burned and is_physical and move_id != "facade":
+        mult *= 0.5
+
+    return mult
+
+
 def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -> float:
     """Estimate damage as fraction of defender's HP using real Gen 9 formula.
 
     atk_boost: stage count to apply to attacker's attack stat (for setup rollouts
     where we're projecting future state). Defender's current defensive boost
-    is read automatically from defender.boosts.
+    is read automatically from defender.boosts. Attacker's ability + status
+    interactions (Guts, burn penalty, Toxic Boost, Flare Boost) are applied
+    automatically.
 
     Critical hits: ignores base 6.25% crit rate (random anomaly). Only accounts
     for high-crit moves (12.5%+) or guaranteed crits.
@@ -1779,6 +1823,14 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
 
     if atk_boost != 0:
         A = int(A * _stage_to_multiplier(atk_boost))
+
+    # Apply attacker's ability + status interactions (Guts boost, burn penalty,
+    # Toxic Boost, Flare Boost). Critical for Conkeldurr-Guts-burned dealing
+    # 1.5× damage instead of 0.5× (and Dialga's Draco Meteor SpA drop is
+    # already handled via atk_boost, applied by callers).
+    ability_mult = _ability_status_multiplier(attacker, is_physical, _norm(getattr(move, "id", "")))
+    if ability_mult != 1.0:
+        A = max(1, int(A * ability_mult))
 
     # Apply defender's current defensive boost/drop. Critical for cases like
     # Shell Smash (-1 Def/SpD) where the user becomes more vulnerable, or
