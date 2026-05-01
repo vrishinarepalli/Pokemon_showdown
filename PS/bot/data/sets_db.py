@@ -12,7 +12,15 @@ import json
 import os
 from typing import Set, List, Optional
 
-_SETS_PATH = "/home/user/Pokemon_showdown/node_modules/pokemon-showdown/data/random-battles/gen9/sets.json"
+# Resolve sets.json relative to the repo root so this works on any machine.
+# Repo layout: <repo>/PS/bot/data/sets_db.py and <repo>/node_modules/...
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+_SETS_PATH_CANDIDATES = [
+    os.path.join(_REPO_ROOT, "node_modules", "pokemon-showdown", "data", "random-battles", "gen9", "sets.json"),
+    os.path.join(_REPO_ROOT, "PS", "node_modules", "pokemon-showdown", "data", "random-battles", "gen9", "sets.json"),
+    # Legacy hardcoded path (kept for backwards compatibility)
+    "/home/user/Pokemon_showdown/node_modules/pokemon-showdown/data/random-battles/gen9/sets.json",
+]
 
 _sets_cache: Optional[dict] = None
 _movepool_cache: dict = {}
@@ -21,10 +29,20 @@ _movepool_cache: dict = {}
 def _load() -> dict:
     global _sets_cache
     if _sets_cache is None:
-        try:
-            with open(_SETS_PATH) as f:
-                _sets_cache = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
+        for path in _SETS_PATH_CANDIDATES:
+            try:
+                with open(path) as f:
+                    _sets_cache = json.load(f)
+                break
+            except (FileNotFoundError, json.JSONDecodeError):
+                continue
+        if _sets_cache is None:
+            import warnings
+            warnings.warn(
+                f"Could not load random battle sets from any of: {_SETS_PATH_CANDIDATES}. "
+                f"Threat prediction will be degraded — install pokemon-showdown via npm in the repo root.",
+                RuntimeWarning,
+            )
             _sets_cache = {}
     return _sets_cache
 
