@@ -12,10 +12,14 @@ import json
 import os
 from typing import Set, List, Optional
 
-# Resolve sets.json relative to the repo root so this works on any machine.
-# Repo layout: <repo>/PS/bot/data/sets_db.py and <repo>/node_modules/...
-_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+# Resolve sets.json. Prefer the bundled copy (always available), then fall back
+# to a locally-installed pokemon-showdown via npm if present.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_HERE, "..", "..", ".."))
 _SETS_PATH_CANDIDATES = [
+    # Bundled with the repo (works without npm install)
+    os.path.join(_HERE, "gen9_randbat_sets.json"),
+    # npm-installed pokemon-showdown (kept fresh by `npm install`)
     os.path.join(_REPO_ROOT, "node_modules", "pokemon-showdown", "data", "random-battles", "gen9", "sets.json"),
     os.path.join(_REPO_ROOT, "PS", "node_modules", "pokemon-showdown", "data", "random-battles", "gen9", "sets.json"),
     # Legacy hardcoded path (kept for backwards compatibility)
