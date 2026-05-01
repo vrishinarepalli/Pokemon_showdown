@@ -122,3 +122,31 @@ def get_roles(species: str) -> List[str]:
         return []
 
     return [s.get("role", "") for s in entry.get("sets", [])]
+
+
+def get_items(species: str) -> Set[str]:
+    """Return union of all possible items for this species in gen9 randbats."""
+    if not species:
+        return set()
+
+    norm = _normalize_species(species)
+    sets = _load()
+    entry = sets.get(norm)
+    if entry is None:
+        best_key = None
+        for key in sets:
+            if norm.startswith(key):
+                if best_key is None or len(key) > len(best_key):
+                    best_key = key
+        if best_key is not None:
+            entry = sets[best_key]
+
+    if entry is None or "sets" not in entry:
+        return set()
+
+    items = set()
+    for s in entry["sets"]:
+        for item in s.get("item", []):
+            items.add(item.lower().replace(" ", "").replace("-", "").replace("'", ""))
+
+    return items

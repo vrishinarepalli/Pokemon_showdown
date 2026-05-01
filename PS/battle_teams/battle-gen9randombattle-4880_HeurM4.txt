@@ -1,0 +1,53 @@
+Lurantis @ Assault Vest
+Ability: Contrary
+Level: 87
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Leafstorm
+- Superpower
+- Knock Off
+- Leechlife
+
+Corviknight @ Rocky Helmet
+Ability: Pressure
+Level: 80
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Bravebird
+- Defog
+- Roost
+- Uturn
+
+Illumise @ Heavy-Duty Boots
+Ability: Prankster
+Level: 91
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Thunder Wave
+- Bugbuzz
+- Encore
+- Roost
+
+Donphan @ Choice Band
+Ability: Sturdy
+Level: 84
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Knock Off
+- Icespinner
+- Earthquake
+- Iceshard
+
+Lapras @ Choice Specs
+Ability: Waterabsorb
+Level: 87
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Hydropump
+- Icebeam
+- Sparklingaria
+- Freezedry
+
+Araquanid @ Heavy-Duty Boots
+Ability: Waterbubble
+Level: 82
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Leechlife
+- Hydropump
+- Liquidation
+- Sticky Web

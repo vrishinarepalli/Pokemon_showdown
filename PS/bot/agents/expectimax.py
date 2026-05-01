@@ -581,6 +581,14 @@ class ExpectimaxAgent(Player):
         our_damage = _damage_fraction(move, attacker, defender, type_chart, atk_boost=atk_boost)
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
 
+        # Apply Stakeout ability bonus (2x damage if opponent switches)
+        # Stakeout (and similar abilities) reward switching predictions
+        if attacker and _norm(getattr(attacker, "ability", None)) == "stakeout":
+            # Check if opponent is predicted to switch (from strategic context)
+            ctx = self._strategic_ctx
+            if ctx and ctx.get("predicted_action", {}).get("action") == "switch":
+                our_damage *= 2.0
+
         our_hp = attacker.current_hp_fraction if attacker else 1.0
         opp_hp = defender.current_hp_fraction if defender else 1.0
 
@@ -616,6 +624,13 @@ class ExpectimaxAgent(Player):
                 risk_penalty = info_deficit * (0.55 - our_after) * 0.6
                 base_score -= risk_penalty
 
+        # KO bonus: if this move guarantees KO of the opponent, add significant bonus
+        # because eliminating the threat outright is extremely valuable.
+        ko_bonus = 0.0
+        if opp_after <= 0.0:
+            # Guaranteed KO — opponent can't attack back, clearing the board is huge
+            ko_bonus = 0.30
+
         # Tiebreakers (small bonuses, won't affect non-tied decisions):
         # 1. Prefer STAB moves (more reliable damage, harder to resist)
         # 2. Prefer higher raw damage (overkill = safety vs miscalculation)
@@ -623,9 +638,9 @@ class ExpectimaxAgent(Player):
             base_score += 0.002  # STAB tiebreaker
         base_score += our_damage * 0.001  # Damage tiebreaker
 
-        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}"
+        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}, ko_bonus={ko_bonus:.3f}"
         return _EvalResult(
-            base_score,
+            base_score + ko_bonus,
             damage_dealt=our_damage,
             damage_taken=opp_damage,
             expected_hp_after=our_after,
@@ -657,6 +672,27 @@ class ExpectimaxAgent(Player):
         defender = battle.opponent_active_pokemon
         if not attacker or not defender:
             return _EvalResult(float("-inf"), reasoning="No attacker or defender")
+
+        # CRITICAL: Reject locking moves (No Retreat) unless we guarantee a KO.
+        # No Retreat locks you in, making you unable to switch next turn.
+        move_id = _norm(getattr(move, "id", ""))
+        if move_id == "noretreat":
+            # Only allow No Retreat if we'll KO the opponent after boosting
+            # Check if we can KO with best move after stat boosts
+            atk_boost = move.boosts.get("atk", 0) if move.boosts else 0
+            spa_boost = move.boosts.get("spa", 0) if move.boosts else 0
+
+            best_ko_damage = 0.0
+            for m in battle.available_moves:
+                if (m.base_power or 0) <= 0:
+                    continue
+                boost = atk_boost if _is_physical_move(m) else spa_boost
+                dmg = _damage_fraction(m, attacker, defender, type_chart, atk_boost=boost)
+                best_ko_damage = max(best_ko_damage, dmg)
+
+            # Only allow No Retreat if we can KO (damage >= 1.0)
+            if best_ko_damage < 1.0:
+                return _EvalResult(float("-inf"), is_setup=True, reasoning="No Retreat locks you in but won't KO opponent")
 
         # CRITICAL: Never setup when we're weak to opponent's type.
         # Check if opponent's type is super-effective against our types.
@@ -736,11 +772,49 @@ class ExpectimaxAgent(Player):
         - Adds Leftovers passive heal (+1/16 per turn) if held
         - Rewards net-positive healing (heal > damage taken = stall win)
         - Skip healing if we'd faint this turn (use attack instead)
+        - Special: Rest + Sleep Talk combo (3-turn rollout: Rest → Sleep Talk → Sleep Talk → Wake)
         """
         attacker = battle.active_pokemon
         defender = battle.opponent_active_pokemon
         if not attacker or not defender:
             return _EvalResult(float("-inf"), reasoning="No attacker or defender")
+
+        # SPECIAL: Rest + Sleep Talk combo evaluation
+        # Rest heals to 100% but puts us asleep for 2 turns, then Sleep Talk randomizes moves
+        move_id = _norm(getattr(move, "id", ""))
+        if move_id == "rest":
+            # Check if we have Sleep Talk available
+            has_sleep_talk = any(_norm(getattr(m, "id", "")) == "sleeptalk" for m in battle.available_moves)
+            if has_sleep_talk:
+                # 3-turn rollout: Rest (heal to 100%), then 2 turns of Sleep Talk (random moves)
+                opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
+
+                # Turn 0: Rest heals us to 100%, we fall asleep
+                our_after_turn0 = max(0.0, 1.0 - opp_damage)  # Opponent attacks after we Rest
+
+                # Turns 1-2: Sleep Talk (forced while asleep)
+                # Assume Sleep Talk randomly uses one of our damage moves (avg damage)
+                our_best_damage = self._best_damage_against(attacker, defender, battle, type_chart)
+                sleep_talk_damage = our_best_damage * 0.75  # Sleep Talk uses random move, assume 75% of best
+
+                # Turn 1: Sleep Talk → opponent attacks
+                opp_after_t1 = max(0.0, defender.current_hp_fraction - sleep_talk_damage) if sleep_talk_damage > 0 else defender.current_hp_fraction
+                our_after_t1 = max(0.0, our_after_turn0 - opp_damage)
+
+                # Turn 2: Sleep Talk → opponent attacks (we wake up after this turn)
+                opp_after_t2 = max(0.0, opp_after_t1 - sleep_talk_damage) if sleep_talk_damage > 0 else opp_after_t1
+                our_after_t2 = max(0.0, our_after_t1 - opp_damage)
+
+                # Evaluate the 3-turn sequence
+                if our_after_t2 > 0:
+                    # We survived Rest + 2x Sleep Talk cycle
+                    score = self._value.score_transition(battle, our_after_t2, opp_after_t2)
+                    # Bonus for healing combo that lets us survive and deal damage
+                    if sleep_talk_damage > 0:
+                        score += 0.15  # Combo bonus
+                    reasoning = f"Rest+Sleep Talk: heal=1.0, 2x Sleep Talk dmg~{sleep_talk_damage:.2f}, survive={our_after_t2:.2f}"
+                    return _EvalResult(score, damage_taken=opp_damage * 3, expected_hp_after=our_after_t2,
+                                     move_category="status", reasoning=reasoning)
 
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
         our_hp = attacker.current_hp_fraction if attacker else 1.0
@@ -759,6 +833,22 @@ class ExpectimaxAgent(Player):
         # Don't heal if we'd faint this turn (better to attack)
         if hp_after_damage <= 0.0:
             return _EvalResult(float("-inf"), reasoning="Would faint this turn")
+
+        # At high HP, only heal if opponent's threat justifies it
+        if our_hp >= 0.80:
+            # Threat must be significant (opponent deals >= 30% damage to justify healing at high HP)
+            if opp_damage < 0.30:
+                return _EvalResult(float("-inf"), reasoning="High HP + low threat = wasteful healing")
+
+            # Healing must meaningfully mitigate opponent's damage (heal >= 75% of threat)
+            if hp_recovered < opp_damage * 0.75:
+                return _EvalResult(float("-inf"), reasoning=f"Healing ({hp_recovered:.2f}) doesn't mitigate threat ({opp_damage:.2f})")
+
+            # We must be dealing enough damage to not create a stall loop
+            # If we can't deal >15% damage, we're just wasting PP healing indefinitely
+            our_best_damage = self._best_damage_against(attacker, defender, battle, type_chart)
+            if our_best_damage < 0.15:
+                return _EvalResult(float("-inf"), reasoning="Not threatening opponent enough, healing creates PP stall loop")
 
         hp_after_heal = min(1.0, hp_after_damage + hp_recovered)
 
@@ -1534,7 +1624,27 @@ def _predict_opp_action(battle, our_pokemon, type_chart, tracker=None):
 
     active_damage = _max_threat_via_movepool(active, our_pokemon, type_chart, tracker=tracker)
 
-    # Use existing M3 switch probability to decide stay vs switch
+    # CRITICAL: Check if opponent has a significantly better threat on bench.
+    # Opponent should switch if any bench mon does more damage than active.
+    # This is pure max-damage optimization on the opponent's side.
+    opp_team = battle.opponent_team or {}
+    best_bench_damage = 0.0
+    best_bench_mon = None
+    for opp_mon in opp_team.values():
+        if opp_mon is None or opp_mon.fainted:
+            continue
+        if active is not None and opp_mon.species == active.species:
+            continue
+        threat = _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=tracker)
+        if threat > best_bench_damage:
+            best_bench_damage = threat
+            best_bench_mon = opp_mon
+
+    # If bench threat > active threat, opponent switches to maximize damage
+    if best_bench_damage > active_damage and best_bench_mon is not None:
+        return {"action": "switch", "target": best_bench_mon.species, "expected_damage": best_bench_damage}
+
+    # Use existing M3 switch probability to decide stay vs switch (for marginal cases)
     info_deficit = _info_deficit(battle)
     our_best = 0.0  # We don't need exact, just check switch-prob threshold
     switch_prob = _estimate_opp_switch_probability(active_damage, our_best, info_deficit)
@@ -1606,11 +1716,25 @@ def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=None) -> 
     # all the opponent's special moves are at -2 SpA and hit far less.
     opp_boosts = opp_mon.boosts or {}
 
+    # Get possible items to apply correct damage multiplier
+    from bot.data.sets_db import get_items
+    possible_items = get_items(opp_mon.species)
+    item_mult = 1.0
+    if "choiceband" in possible_items:
+        item_mult = 1.5
+    elif "choicespecs" in possible_items:
+        item_mult = 1.5
+
     # Revealed damaging moves
     for m in opp_mon.moves.values():
         if (m.base_power or 0) > 0:
             boost = opp_boosts.get("atk" if _is_physical_move(m) else "spa", 0)
             d = _damage_fraction(m, opp_mon, our_pokemon, type_chart, atk_boost=boost)
+            # Apply item multiplier only if it matches move type
+            if _is_physical_move(m) and "choiceband" in possible_items:
+                d *= 1.5
+            elif not _is_physical_move(m) and "choicespecs" in possible_items:
+                d *= 1.5
             best = max(best, d)
 
     # Fill in unknown slots from movepool. Prefer tracker's pruned pool if available.
@@ -1633,6 +1757,11 @@ def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=None) -> 
             try:
                 boost = opp_boosts.get("atk" if _is_physical_move(m) else "spa", 0)
                 d = _damage_fraction(m, opp_mon, our_pokemon, type_chart, atk_boost=boost)
+                # Apply item multiplier only if it matches move type
+                if _is_physical_move(m) and "choiceband" in possible_items:
+                    d *= 1.5
+                elif not _is_physical_move(m) and "choicespecs" in possible_items:
+                    d *= 1.5
                 best = max(best, d)
             except Exception:
                 continue

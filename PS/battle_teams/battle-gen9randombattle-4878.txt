@@ -1,0 +1,68 @@
+======================================================================
+=== ExpecM4 TEAM (battle=battle-gen9randombattle-4878) ===
+======================================================================
+  diancie L82 [ACTIVE]
+    item: assaultvest
+    ability: clearbody
+    moves: diamondstorm, bodypress, moonblast, earthpower
+    hp: 100%
+  regieleki L79
+    item: magnet
+    ability: transistor
+    moves: voltswitch, thunderbolt, rapidspin, terablast
+    hp: 100%
+  slaking L84
+    item: choiceband
+    ability: truant
+    moves: earthquake, knockoff, doubleedge, gigaimpact
+    hp: 100%
+  ursaring L84
+    item: eviolite
+    ability: guts
+    moves: bodyslam, rest, earthquake, sleeptalk
+    hp: 100%
+  flamigo L82
+    item: choicescarf
+    ability: scrappy
+    moves: uturn, throatchop, closecombat, bravebird
+    hp: 100%
+  rotomfan L86
+    item: heavydutyboots
+    ability: levitate
+    moves: thunderbolt, airslash, nastyplot, thunderwave
+    hp: 100%
+
+======================================================================
+=== HeurM4 TEAM (battle=battle-gen9randombattle-4878) ===
+======================================================================
+  duraludon L82 [ACTIVE]
+    item: eviolite
+    ability: lightmetal
+    moves: flashcannon, dragontail, dracometeor, bodypress
+    hp: 100%
+  rotomwash L82
+    item: leftovers
+    ability: levitate
+    moves: hydropump, nastyplot, willowisp, thunderbolt
+    hp: 100%
+  dialgaorigin L73
+    item: adamantcrystal
+    ability: pressure
+    moves: dracometeor, stealthrock, fireblast, flashcannon
+    hp: 100%
+  manaphy L78
+    item: leftovers
+    ability: hydration
+    moves: tailglow, icebeam, energyball, surf
+    hp: 100%
+  arboliva L91
+    item: leftovers
+    ability: seedsower
+    moves: hypervoice, energyball, earthpower, strengthsap
+    hp: 100%
+  mienshao L83
+    item: lifeorb
+    ability: regenerator
+    moves: knockoff, poisonjab, swordsdance, closecombat
+    hp: 100%
+
