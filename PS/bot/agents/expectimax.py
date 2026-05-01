@@ -985,6 +985,21 @@ class ExpectimaxAgent(Player):
             if ctx["opp_will_switch"]:
                 value *= 1.2  # Opp switching = immediate hazard payoff
 
+        # Future-value discount: hazards only pay off if we live long enough to
+        # see opp switch into them. When we're losing badly (few mons left + in
+        # DANGER), prefer immediate damage over setup. Setting SR with our 5th
+        # mon at low HP while losing the game = wasted turn vs. a damage move
+        # that has any chance of pressuring opp.
+        our_team = (battle.team or {}).values()
+        our_mons_alive = sum(
+            1 for p in our_team
+            if p and (p.current_hp_fraction or 0) > 0
+        )
+        if our_mons_alive <= 2 and ctx is not None and ctx["state"] == "DANGER":
+            # Down to last 1-2 mons under pressure: hazard value collapses.
+            # Damage moves should win if they have any chance of helping.
+            value *= 0.3
+
         score = base_score + value
         reasoning = f"{mid}: opp_mons_left={opp_mons_left}, value={value:.3f}, opp_dmg={opp_damage:.3f}"
         return _EvalResult(
