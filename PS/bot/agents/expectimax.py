@@ -1944,23 +1944,47 @@ def _stage_to_multiplier(stage: int) -> float:
 def _switch_offensive_bonus(pokemon, opp, type_chart) -> float:
     """Bonus for switching to a mon that threatens the opponent back.
 
-    Rewards pivots that gain offensive advantage (super-effective STAB, immunity to opp's moves).
+    Considers speed — a faster switch-in that can KO is much more valuable
+    than a slower one with the same firepower, since it removes the opp
+    before taking another hit. Pikachu vs Oricorio is the canonical case:
+    fragile but faster + super-effective STAB = clean trade.
     """
-    if not opp:
+    if not opp or not pokemon:
         return 0.0
 
-    bonus = 0.0
+    # Find best damaging move from switch-in's revealed moves
+    best_dmg = 0.0
+    has_se_stab = False
     for move in pokemon.moves.values():
         bp = move.base_power or 0
         if bp <= 0:
             continue
         stab = 1.5 if move.type in pokemon.types else 1.0
-        eff = move.type.damage_multiplier(
-            opp.type_1, opp.type_2, type_chart=type_chart
-        )
+        eff = move.type.damage_multiplier(opp.type_1, opp.type_2, type_chart=type_chart)
+        try:
+            d = _damage_fraction(move, pokemon, opp, type_chart)
+        except Exception:
+            d = 0.0
+        best_dmg = max(best_dmg, d)
         if eff >= 2.0 and stab == 1.5:
-            bonus = max(bonus, 0.15)
-        elif eff >= 2.0:
-            bonus = max(bonus, 0.10)
+            has_se_stab = True
+
+    bonus = 0.0
+    if has_se_stab:
+        bonus = 0.15  # Has super-effective STAB
+
+    # Speed check: faster switch-in that can KO is huge — opp dies before they
+    # get another turn. We outspeed = first move = guaranteed damage applied.
+    our_speed = _effective_speed(pokemon, use_actual=True)
+    opp_speed = _effective_speed(opp, use_actual=False)
+    is_faster = our_speed > opp_speed
+    opp_hp = opp.current_hp_fraction if opp else 1.0
+
+    if is_faster:
+        # Faster + can KO opponent's remaining HP → very valuable
+        if best_dmg >= opp_hp:
+            bonus += 0.25  # Pivot KOs before getting hit
+        elif best_dmg >= opp_hp * 0.5:
+            bonus += 0.10  # Significant damage with speed advantage
 
     return bonus
