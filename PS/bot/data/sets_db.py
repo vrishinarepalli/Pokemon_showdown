@@ -124,8 +124,32 @@ def get_roles(species: str) -> List[str]:
     return [s.get("role", "") for s in entry.get("sets", [])]
 
 
+# Showdown's gen9 randbat generator picks items by role. The bundled sets.json
+# omits the explicit "item" field, so we infer the *possible* item set from the
+# role(s) in each species' set list. Conservative: include every item a role
+# might carry so callers can pick the worst-case multiplier.
+_ROLE_ITEMS = {
+    "Wallbreaker": {"choiceband", "choicespecs", "lifeorb"},
+    "Fast Attacker": {"choicescarf", "lifeorb", "choiceband", "choicespecs"},
+    "Setup Sweeper": {"lifeorb"},
+    "Fast Bulky Setup": {"lifeorb", "leftovers"},
+    "Bulky Setup": {"leftovers", "lifeorb"},
+    "Bulky Attacker": {"leftovers", "assaultvest", "heavydutyboots"},
+    "Bulky Support": {"leftovers", "heavydutyboots"},
+    "Fast Support": {"heavydutyboots", "choicescarf"},
+    "Tera Blast user": {"lifeorb"},
+    "AV Pivot": {"assaultvest"},
+}
+
+
 def get_items(species: str) -> Set[str]:
-    """Return union of all possible items for this species in gen9 randbats."""
+    """Return union of all possible items for this species in gen9 randbats.
+
+    The bundled sets.json doesn't carry items — Showdown's randbat generator
+    derives them from role at battle-team-build time. We infer from role so
+    damage prediction can apply Life Orb / Choice Band / Choice Specs
+    multipliers and switch-eval can account for Assault Vest defensive boost.
+    """
     if not species:
         return set()
 
@@ -146,7 +170,12 @@ def get_items(species: str) -> Set[str]:
 
     items = set()
     for s in entry["sets"]:
+        # Honor explicit item field if present (some custom data sources include it)
         for item in s.get("item", []):
             items.add(item.lower().replace(" ", "").replace("-", "").replace("'", ""))
+        # Otherwise infer from role
+        role = s.get("role", "")
+        if role in _ROLE_ITEMS:
+            items.update(_ROLE_ITEMS[role])
 
     return items

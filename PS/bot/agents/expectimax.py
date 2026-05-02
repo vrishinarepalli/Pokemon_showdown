@@ -720,6 +720,17 @@ class ExpectimaxAgent(Player):
         # Check if opponent's type is super-effective against our types.
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
 
+        # Worst-case threat for setup planning: if opp is predicted to switch,
+        # we'll face their switch-in at +stages. Use the predicted switch-in's
+        # damage so we don't underestimate the cost of staying in to use the boost.
+        # When opp stays, the current active's damage is the right estimate.
+        ctx = self._strategic_ctx
+        worst_opp_damage = opp_damage
+        if ctx is not None:
+            predicted = ctx.get("predicted_action", {})
+            if predicted.get("action") == "switch":
+                worst_opp_damage = max(opp_damage, predicted.get("expected_damage", 0.0))
+
         # Check type advantage: for each opponent type, see if moves of that type
         # are super-effective against us.
         for opp_type in [defender.type_1, defender.type_2]:
@@ -730,12 +741,14 @@ class ExpectimaxAgent(Player):
                     return _EvalResult(float("-inf"), is_setup=True, reasoning=f"We're weak to {opp_type} (opponent's type), cannot setup safely")
 
         our_hp_t1 = attacker.current_hp_fraction if attacker else 1.0
-        our_after_t1 = max(0.0, our_hp_t1 - opp_damage)
+        # Use worst_opp_damage for the survival check: if the bench can OHKO us at
+        # +stages, setup is wasted (boost dies with us).
+        our_after_t1 = max(0.0, our_hp_t1 - worst_opp_damage)
         if our_after_t1 <= 0.0:
             # Setup with no payoff: we faint without using the boost. Strictly worse
             # than any damaging move (which at least might land if we have priority
             # or speed). Return -inf so we never set up while in KO range.
-            return _EvalResult(float("-inf"), damage_taken=opp_damage, expected_hp_after=0.0, is_setup=True, reasoning="Setup would result in KO — boost is wasted on faint")
+            return _EvalResult(float("-inf"), damage_taken=worst_opp_damage, expected_hp_after=0.0, is_setup=True, reasoning=f"Setup would result in KO — worst threat does {worst_opp_damage:.2f} (active does {opp_damage:.2f})")
 
         atk_boost = move.boosts.get("atk", 0) if move.boosts else 0
         spa_boost = move.boosts.get("spa", 0) if move.boosts else 0
@@ -750,11 +763,15 @@ class ExpectimaxAgent(Player):
             dmg = _damage_fraction(m, attacker, defender, type_chart, atk_boost=boost)
             best_our_damage_t2 = max(best_our_damage_t2, dmg)
 
+        # T2 damage: use worst-case (active or bench), since by then opp may have
+        # switched to a stronger threat. Otherwise we systematically underestimate
+        # the cost of staying in to use the boost.
+        t2_opp_damage = worst_opp_damage
         if _effective_speed(attacker, use_actual=True) >= _effective_speed(defender, use_actual=False):
             opp_after = max(0.0, defender.current_hp_fraction - best_our_damage_t2)
-            our_after = max(0.0, our_after_t1 - (opp_damage if opp_after > 0.0 else 0.0))
+            our_after = max(0.0, our_after_t1 - (t2_opp_damage if opp_after > 0.0 else 0.0))
         else:
-            our_after = max(0.0, our_after_t1 - opp_damage)
+            our_after = max(0.0, our_after_t1 - t2_opp_damage)
             opp_after = max(0.0, defender.current_hp_fraction - (best_our_damage_t2 if our_after > 0.0 else 0.0))
 
         score = self._value.score_transition(battle, our_after, opp_after)
@@ -777,7 +794,7 @@ class ExpectimaxAgent(Player):
             elif ctx["state"] == "DANGER":
                 score -= 0.10  # Avoid setup when threats loom
 
-        reasoning = f"2-turn setup: +{atk_boost}atk/+{spa_boost}spa, t2_damage={best_our_damage_t2:.3f}, opp_dmg={opp_damage:.3f}"
+        reasoning = f"2-turn setup: +{atk_boost}atk/+{spa_boost}spa, t2_damage={best_our_damage_t2:.3f}, opp_dmg={opp_damage:.3f}, worst_opp_dmg={worst_opp_damage:.3f}"
         return _EvalResult(
             score,
             damage_taken=opp_damage * 2,
@@ -1762,25 +1779,27 @@ def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=None) -> 
     # all the opponent's special moves are at -2 SpA and hit far less.
     opp_boosts = opp_mon.boosts or {}
 
-    # Get possible items to apply correct damage multiplier
+    # Get possible items to apply correct damage multiplier. Conservative: pick
+    # the highest plausible multiplier per move category (physical/special).
+    # Choice Band/Specs = 1.5x for the matching category; Life Orb = 1.3x for both.
     from bot.data.sets_db import get_items
     possible_items = get_items(opp_mon.species)
-    item_mult = 1.0
-    if "choiceband" in possible_items:
-        item_mult = 1.5
-    elif "choicespecs" in possible_items:
-        item_mult = 1.5
+
+    def _item_mult(is_phys: bool) -> float:
+        if is_phys and "choiceband" in possible_items:
+            return 1.5
+        if (not is_phys) and "choicespecs" in possible_items:
+            return 1.5
+        if "lifeorb" in possible_items:
+            return 1.3
+        return 1.0
 
     # Revealed damaging moves
     for m in opp_mon.moves.values():
         if (m.base_power or 0) > 0:
             boost = opp_boosts.get("atk" if _is_physical_move(m) else "spa", 0)
             d = _damage_fraction(m, opp_mon, our_pokemon, type_chart, atk_boost=boost)
-            # Apply item multiplier only if it matches move type
-            if _is_physical_move(m) and "choiceband" in possible_items:
-                d *= 1.5
-            elif not _is_physical_move(m) and "choicespecs" in possible_items:
-                d *= 1.5
+            d *= _item_mult(_is_physical_move(m))
             best = max(best, d)
 
     # Fill in unknown slots from movepool. Prefer tracker's pruned pool if available.
@@ -1803,11 +1822,7 @@ def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=None) -> 
             try:
                 boost = opp_boosts.get("atk" if _is_physical_move(m) else "spa", 0)
                 d = _damage_fraction(m, opp_mon, our_pokemon, type_chart, atk_boost=boost)
-                # Apply item multiplier only if it matches move type
-                if _is_physical_move(m) and "choiceband" in possible_items:
-                    d *= 1.5
-                elif not _is_physical_move(m) and "choicespecs" in possible_items:
-                    d *= 1.5
+                d *= _item_mult(_is_physical_move(m))
                 best = max(best, d)
             except Exception:
                 continue
