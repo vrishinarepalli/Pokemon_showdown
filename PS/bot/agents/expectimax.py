@@ -405,7 +405,7 @@ class ExpectimaxAgent(Player):
         self._prev_opp_pokemon = opp_pokemon
 
         if not battle.available_moves and battle.available_switches:
-            chosen_switch = _best_forced_switch(battle, type_chart)
+            chosen_switch = _best_forced_switch(battle, type_chart, tracker=self._opp_tracker)
             order = self.create_order(chosen_switch)
             self._battle_logger.log_decision("switch", chosen_switch.species, 0.0, our_hp, opp_hp, chosen=True)
             self._battle_logger.end_turn()
@@ -1883,13 +1883,32 @@ def _grounded(pokemon) -> bool:
     return True
 
 
-def _best_forced_switch(battle, type_chart):
-    """Pick best switch-in after fainting, accounting for hazards."""
+def _best_forced_switch(battle, type_chart, tracker=None):
+    """Pick best switch-in after fainting, accounting for hazards.
+
+    Uses _max_threat_via_movepool (not just revealed moves) so we account for
+    unrevealed coverage moves and Choice Band/Specs/Life Orb item multipliers.
+    Without this, we'd pick switch-ins that look safe by revealed-data alone
+    and routinely get OHKO'd by an unrevealed coverage move.
+    """
     opp = battle.opponent_active_pokemon
-    return max(
-        battle.available_switches,
-        key=lambda p: p.current_hp_fraction - _hazard_damage(p, battle.side_conditions, type_chart) - _max_opp_damage_fraction(opp, p, type_chart),
-    )
+
+    def score(p):
+        hazard = _hazard_damage(p, battle.side_conditions, type_chart)
+        threat = _max_threat_via_movepool(opp, p, type_chart, tracker=tracker)
+        # Also consider type matchup: penalize switching into something the
+        # opp's type is super-effective against (mirrors _eval_switch's gate).
+        type_penalty = 0.0
+        if opp is not None:
+            for opp_type in [opp.type_1, opp.type_2]:
+                if opp_type:
+                    mult = opp_type.damage_multiplier(p.type_1, p.type_2, type_chart=type_chart)
+                    if mult >= 2.0:
+                        type_penalty = 1.0  # Hard penalty: don't pick a 2x weak mon if avoidable
+                        break
+        return p.current_hp_fraction - hazard - threat - type_penalty
+
+    return max(battle.available_switches, key=score)
 
 
 def _accuracy(move) -> float:
