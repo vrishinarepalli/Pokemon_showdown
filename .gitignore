@@ -29,3 +29,4 @@ Thumbs.db
 # M4 battle debug output (regenerated on every smoke test)
 PS/battle_logs.json
 PS/replays/
+SETUP_CLAUDE_CLI.md
