@@ -67,6 +67,9 @@ class OppTeamTracker:
 
     def __init__(self):
         self._slots: Dict[str, dict] = {}
+        # Tracks how often opp switched a species in while each of our species was active.
+        # Format: {our_species_key: {opp_species_key: count}}
+        self._switch_in_history: Dict[str, Dict[str, int]] = {}
 
     def observe_pokemon(self, species: str) -> None:
         """Initialize a slot for this species if not already present."""
@@ -156,6 +159,28 @@ class OppTeamTracker:
         key = _norm(species)
         slot = self._slots.get(key)
         return slot["choice_lock"] if slot else None
+
+    def observe_switch_in(self, our_species: str, opp_species: str) -> None:
+        """Record that opp switched opp_species in while our active was our_species."""
+        our_key = _norm(our_species)
+        opp_key = _norm(opp_species)
+        if not our_key or not opp_key:
+            return
+        if our_key not in self._switch_in_history:
+            self._switch_in_history[our_key] = {}
+        self._switch_in_history[our_key][opp_key] = (
+            self._switch_in_history[our_key].get(opp_key, 0) + 1
+        )
+
+    def get_switch_in_weight(self, our_species: str, opp_species: str) -> float:
+        """Fraction of observed switch-ins vs our_species that were opp_species (0.0–1.0)."""
+        our_key = _norm(our_species)
+        opp_key = _norm(opp_species)
+        history = self._switch_in_history.get(our_key, {})
+        total = sum(history.values())
+        if total == 0:
+            return 0.0
+        return history.get(opp_key, 0) / total
 
     def get_remaining_sets_count(self, species: str) -> int:
         """How many possible sets remain after pruning. Useful for confidence."""

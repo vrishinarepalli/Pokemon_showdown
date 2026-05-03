@@ -329,6 +329,11 @@ class ExpectimaxAgent(Player):
                 opp_last_action = "switch"
                 opp_prev_pokemon = self._prev_opp_pokemon
 
+        # Record switch-in pattern: track which opp mon comes in vs our active mon.
+        # Used to predict clodsire-vs-jolteon style pivots in future turns.
+        if opp_last_action == "switch" and self._opp_tracker is not None:
+            self._opp_tracker.observe_switch_in(our_pokemon, opp_pokemon)
+
         # Update sweep state: consecutive attacks from opponent indicate a sweep
         if opp_last_action == "switch":
             # Opponent pivoted: reset sweep counter
@@ -573,6 +578,19 @@ class ExpectimaxAgent(Player):
         else:
             move_category = "status"
 
+        # Never use a move that heals the opponent (Water Absorb, Volt Absorb, etc.)
+        if (move.base_power or 0) > 0:
+            _, heals_opp = _check_ability_matchup(defender, move.type, move=move)
+            if heals_opp:
+                return _EvalResult(
+                    float("-inf"),
+                    damage_dealt=0.0,
+                    damage_taken=0.0,
+                    expected_hp_after=attacker.current_hp_fraction if attacker else 1.0,
+                    move_category=move_category,
+                    reasoning="Move heals opponent — never use",
+                )
+
         # Read our active boosts so Swords Dance, Nasty Plot, etc. are reflected
         boosts = (attacker.boosts if attacker else None) or {}
         is_physical = _is_physical_move(move)
@@ -637,8 +655,19 @@ class ExpectimaxAgent(Player):
         # / any damage we can squeeze out of our active mon before fainting.
         # Without this, switching to a "fresh" mon scores higher even though that mon
         # also can't beat the opponent — wasting the dying mon's free attack.
-        doomed_bonus = 0.0
+        # Near-KO bonus: when we go first (priority or speed) and bring opp to within
+        # the damage-roll window of a KO (85-100% of their remaining HP), partially
+        # reward the probability that the actual roll finishes them. This matters most
+        # for priority moves like Extremespeed where the calc may show a hair's-breadth
+        # near-miss but the real roll would KO.
+        near_ko_bonus = 0.0
         goes_first = _we_go_first(move, attacker, defender, battle)
+        if goes_first and opp_after > 0.0 and opp_hp > 0.0:
+            pct = our_damage / opp_hp
+            if pct >= 0.85:
+                near_ko_bonus = 0.30 * min(1.0, (pct - 0.85) / 0.15)
+
+        doomed_bonus = 0.0
         is_doomed = (not goes_first) and opp_damage >= our_hp and our_hp > 0
         if is_doomed and our_damage > 0:
             # Active mon is doomed; if this move has priority, we DO get a hit in.
@@ -660,9 +689,9 @@ class ExpectimaxAgent(Player):
             base_score += 0.002  # STAB tiebreaker
         base_score += our_damage * 0.001  # Damage tiebreaker
 
-        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}, ko_bonus={ko_bonus:.3f}, doomed_bonus={doomed_bonus:.3f}"
+        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}, ko_bonus={ko_bonus:.3f}, doomed_bonus={doomed_bonus:.3f}, near_ko_bonus={near_ko_bonus:.3f}"
         return _EvalResult(
-            base_score + ko_bonus + doomed_bonus,
+            base_score + ko_bonus + doomed_bonus + near_ko_bonus,
             damage_dealt=our_damage,
             damage_taken=opp_damage,
             expected_hp_after=our_after,
@@ -1552,6 +1581,16 @@ def _predict_opp_switch_in(battle, our_active, type_chart, tracker=None):
 
         # M3-style score: offense - 0.4 * defense_penalty (normalized)
         score = offense - 0.4 * defense_penalty
+
+        # Historical pattern bonus: if opp has repeatedly pivoted this mon in
+        # against our active species, weight it above pure matchup math.
+        if tracker is not None and our_active is not None:
+            history_w = tracker.get_switch_in_weight(
+                _norm(our_active.species), _norm(opp_mon.species)
+            )
+            if history_w > 0:
+                score += history_w * 0.8
+
         if score > best_score:
             best_score = score
             best = opp_mon
