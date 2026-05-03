@@ -1,0 +1,53 @@
+Volbeat @ Heavy-Duty Boots
+Ability: Prankster
+Level: 90
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Thunder Wave
+- Encore
+- Roost
+- Lunge
+
+Regieleki @ Magnet
+Ability: Transistor
+Level: 79
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Rapidspin
+- Voltswitch
+- Terablast
+- Thunderbolt
+
+Dondozo @ Leftovers
+Ability: Unaware
+Level: 78
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Curse
+- Rest
+- Sleeptalk
+- Wavecrash
+
+Greattusk @ Choice Scarf
+Ability: Protosynthesis
+Level: 77
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Knock Off
+- Headlongrush
+- Close Combat
+- Icespinner
+
+Ampharos @ Life Orb
+Ability: Static
+Level: 88
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Focusblast
+- Thunderbolt
+- Agility
+- Dazzlinggleam
+
+Dragapult @ Choice Specs
+Ability: Infiltrator
+Level: 77
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Uturn
+- Fireblast
+- Shadowball
+- Draco Meteor

@@ -1,0 +1,53 @@
+Salazzle @ Leftovers
+Ability: Corrosion
+Level: 83
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Toxic
+- Protect
+- Flamethrower
+- Substitute
+
+Quaquaval @ Choice Band
+Ability: Moxie
+Level: 79
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Tripleaxel
+- Close Combat
+- Uturn
+- Aquastep
+
+Skeledirge @ Heavy-Duty Boots
+Ability: Unaware
+Level: 79
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Torchsong
+- Shadowball
+- Slack Off
+- Flame Charge
+
+Krookodile @ Leftovers
+Ability: Intimidate
+Level: 79
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Bulk Up
+- Earthquake
+- Gunk Shot
+- Knock Off
+
+Bombirdier @ Heavy-Duty Boots
+Ability: Bigpecks
+Level: 85
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Suckerpunch
+- Roost
+- Knock Off
+- Bravebird
+
+Screamtail @ Leftovers
+Ability: Protosynthesis
+Level: 84
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Protect
+- Playrough
+- Wish
+- Encore

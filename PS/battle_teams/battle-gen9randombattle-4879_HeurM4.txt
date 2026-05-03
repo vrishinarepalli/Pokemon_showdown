@@ -1,0 +1,53 @@
+Ariados @ Focus Sash
+Ability: Insomnia
+Level: 95
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Toxic Spikes
+- Megahorn
+- Poison Jab
+- Sticky Web
+
+Grimmsnarl @ Leftovers
+Ability: Prankster
+Level: 83
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Suckerpunch
+- Spiritbreak
+- Thunder Wave
+- Taunt
+
+Roaringmoon @ Boosterenergy
+Ability: Protosynthesis
+Level: 72
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Outrage
+- Ironhead
+- Dragon Dance
+- Knock Off
+
+Zekrom @ Leftovers
+Ability: Teravolt
+Level: 71
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Substitute
+- Boltstrike
+- Dragon Dance
+- Outrage
+
+Plusle @ Life Orb
+Ability: Lightningrod
+Level: 95
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Alluringvoice
+- Nasty Plot
+- Thunderbolt
+- Grassknot
+
+Forretress @ Leftovers
+Ability: Sturdy
+Level: 84
+EVs: 85 HP / 85 Atk / 85 Def / 85 SpA / 85 SpD / 85 Spe
+- Spikes
+- Rapidspin
+- Ironhead
+- Bodypress

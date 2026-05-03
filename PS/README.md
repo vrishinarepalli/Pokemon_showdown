@@ -1,121 +1,105 @@
-# Pokemon Showdown Bot
+# Pokemon Showdown AI Bot
 
-A playing agent for Pokemon Showdown. The initial target is Gen 9
-Random Battles. The project combines three layers: a belief state over
-the opponent's hidden information, a search-based planner, and a
-learned value function trained by self-play.
+A Gen 9 Random Battle agent for Pokemon Showdown. The bot uses a depth-1 expectimax planner backed by a hand-crafted value function, a Bayesian belief state over the opponent's hidden team, and per-battle adaptive logic that learns the opponent's patterns mid-game.
 
-An earlier phase of this repository produced a real-time set
-predictor as a Chrome extension. That predictor is retained and
-reused as the belief-state component of the bot.
+---
 
-## Project direction
-
-- **v1** — Random Battle agent, trained by self-play against a local
-  `pokemon-showdown` server, evaluated offline and in manual challenge
-  battles. Scope, milestones, and design rationale are in
-  [`specs_bot_v1.md`](specs_bot_v1.md).
-- **Set predictor (existing)** — Python module under `src/` and
-  Chrome extension under `extension/`. Documented in
-  [`specs_set_predictor.md`](specs_set_predictor.md). Still usable as
-  a standalone product; also feeds the bot's belief state.
-- **Team generator** — earlier direction, archived. See
-  [`specs.md`](specs.md).
-
-Automated play on the public ladder is out of scope. Showdown's Terms
-of Service prohibit it; the bot is developed and evaluated against a
-local server and consenting opponents in challenge battles.
-
-## Architecture at a glance
+## How it works
 
 ```
-  WebSocket                belief state              planner
-  to local      ---->      over randbats     ---->   expectimax /
-  Showdown                 sets (Bayes)              MCTS
-  server
-                                                       |
-                                                       v
-                                                  value function
-                                                  (hand-crafted -> NN)
+Showdown server  -->  poke-env client  -->  Belief state  -->  Expectimax planner
+  (WebSocket)                                (Bayes over                |
+                                              randbat sets)        Value function
+                                                                   (handcrafted)
 ```
 
-The client layer connects to Showdown using `poke-env`. The belief
-module adapts the existing predictor to operate on Random Battle set
-data published by the Showdown team. The simulator used for rollouts
-is Showdown's own engine, accessed through `poke-env`.
+- **Belief state** (`bot/belief/`) — Tracks revealed moves, abilities, and items each turn. Prunes the set of possible builds using the official Showdown random battle data.
+- **Planner** (`bot/agents/expectimax.py`) — Depth-1 expectimax over all moves and switches. Evaluates type matchups, speed tiers, hazards, setup moves, sacrifice plays, and mid-game adaptation (switch-in pattern learning, stat-boost tracking).
+- **Opponent tracker** (`bot/data/opp_tracker.py`) — Records which opponent Pokemon switch in against each of our active Pokemon, letting the bot predict pivots like "clodsire always comes in on jolteon."
+- **Value function** (`bot/value/handcrafted.py`) — Scores the HP exchange after each simulated turn. Non-linear penalty for damage taken, reward for damage dealt, KO bonuses.
+
+---
 
 ## Repository layout
 
 ```
 PS/
-  specs_bot_v1.md            v1 scope and design rationale
-  specs_set_predictor.md     predictor component spec
-  specs.md                   archived team generator plan
-  TESTING.md                 test guide
+  bot/                       Main bot package
+    agents/
+      expectimax.py          Core decision engine (move + switch evaluator)
+      heuristic.py           Opponent agent (used in self-play)
+      battle_logger.py       Per-turn debug logging
+      debug.py               In-game state printer
+    belief/
+      state.py               Bayesian belief state over opp sets
+    data/
+      opp_tracker.py         Per-battle opponent team + pattern tracker
+      sets_db.py             Randbat sets database interface
+    value/
+      handcrafted.py         Hand-crafted value function
+    client/                  WebSocket client (poke-env wrapper)
+    training/                Self-play training harness
 
-  src/                       Python predictor (reused as belief state)
-    data_fetcher.py
-    data_manager.py
-    pokemon_data_parser.py
-    set_predictor.py
+  src/                       Chrome extension predictor (standalone)
+  extension/                 Chrome extension UI
+  data/                      Cached Pokedex, moves, abilities, usage stats
+  tests/                     Test suite
+  docs/                      Design docs, specs, architecture notes
 
-  data/                      cached datasets
-    pokemon/                 pokedex, moves, abilities, items
-    usage/                   Smogon usage statistics
-
-  extension/                 Chrome extension (predictor overlay)
-    background/
-    content/
-    lib/
-    popup/
-    manifest.json
-
-  bot/                       planned, see specs_bot_v1.md
-
-  convert_data_to_js.py      bakes data/ into extension/lib/
-  update_data.py             refreshes Smogon usage data
-  test_scenarios.py          predictor test harness
   requirements.txt           Python dependencies
+  run_tests.sh               Run test suite
+  extract_logs.sh            Extract battle logs for a specific turn
 ```
 
-The `bot/` tree is described in `specs_bot_v1.md`; it is added as
-each milestone is implemented rather than stubbed up front.
+---
 
-## Status
+## Getting started
 
-| Component             | Status                |
-| --------------------- | --------------------- |
-| Data pipeline         | Complete              |
-| Set predictor (lib)   | Complete              |
-| Chrome extension      | Complete              |
-| Bot v1 design         | Complete (this doc)   |
-| Bot v1 milestones     | Not started           |
+### Prerequisites
 
-## Installation
+- Python 3.10+
+- A local [Pokemon Showdown](https://github.com/smogon/pokemon-showdown) server
 
-### Predictor / extension
+### Install
 
 ```bash
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-python convert_data_to_js.py
 ```
 
-Load `extension/` as an unpacked extension from
-`chrome://extensions/`.
+### Run the local Showdown server
 
-### Bot (when implemented)
+```bash
+git clone https://github.com/smogon/pokemon-showdown ~/pokemon-showdown
+cd ~/pokemon-showdown && npm install
+node pokemon-showdown start --no-security
+```
 
-Will require a local `pokemon-showdown` server and `poke-env`. Setup
-instructions will be added with the M1 milestone.
+### Run a smoke test battle
 
-## Documentation
+```bash
+python -m bot.agents.smoke_test
+```
 
-- [`specs_bot_v1.md`](specs_bot_v1.md) — bot v1 scope, architecture,
-  milestones, design rationale.
-- [`specs_set_predictor.md`](specs_set_predictor.md) — predictor
-  component specification.
-- [`specs.md`](specs.md) — archived team generator direction.
-- [`TESTING.md`](TESTING.md) — predictor test guide.
+This runs a single Gen 9 Random Battle and prints the result. Use it to confirm everything is wired up correctly.
+
+### Run the test suite
+
+```bash
+./run_tests.sh
+```
+
+---
+
+## Debugging
+
+Use `newbug <turn>` in your shell to capture the decision log for a specific turn into a numbered `debug<n>.txt` file. Use `rmdebug <n>` to clean up debug files 1 through n.
+
+Both commands are defined in `~/.zshrc`. See `extract_logs.sh` for the underlying log extraction.
+
+---
+
+## Design docs
+
+Full specs, architecture notes, and feature write-ups are in [`docs/`](docs/).

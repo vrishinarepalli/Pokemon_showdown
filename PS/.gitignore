@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+venv/
+.venv/
+*.egg
+
+# Environment
+.env
+.env.*
+
+# Debug / test output (use rmdebug <n> to clean up debug files)
+debug*.txt
+test_output.txt
+test_results*.txt
+analysis.txt
+first_5_turns.json
+battle_logs.json
+
+# Replays (large, not needed in source control)
+replays/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
