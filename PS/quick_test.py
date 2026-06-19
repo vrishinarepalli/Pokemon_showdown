@@ -76,10 +76,10 @@ def test_damage_calculator():
         dm = DataManager()
         calc = DamageCalculator(dm)
 
-        print("  Calculating: Raging Bolt Thunderbolt vs Great Tusk")
+        print("  Calculating: Raging Bolt Thunderbolt vs Corviknight")
         result = calc.calculate_damage(
             attacker_name="Raging Bolt",
-            defender_name="Great Tusk",
+            defender_name="Corviknight",
             move_name="Thunderbolt"
         )
 

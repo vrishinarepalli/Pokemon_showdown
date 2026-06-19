@@ -10,6 +10,14 @@ HP exchange and whether a KO was secured.
 """
 
 import math
+import os
+
+# A/B knobs (defaults reproduce prior behavior).
+# _W_OPP scales the reward for damaging the opponent (aggression vs caution);
+# _W_SELF scales the penalty for our own HP loss. Higher _W_OPP / lower _W_SELF
+# = more aggressive race-style play.
+_W_OPP = float(os.environ.get("PS_W_OPP", "2.0"))   # tuned: 2.0 ≫ 1.0 (was too defensive)
+_W_SELF = float(os.environ.get("PS_W_SELF", "1.0"))
 
 
 class HandcraftedValue:
@@ -54,5 +62,5 @@ class HandcraftedValue:
         # Major red flag if we get KO'd
         self_ko_penalty = -0.15 if our_hp_after <= 0.0 else 0.0
 
-        total = our_penalty + opp_reward + ko_bonus + self_ko_penalty
+        total = _W_SELF * our_penalty + _W_OPP * opp_reward + ko_bonus + self_ko_penalty
         return max(-1.0, min(1.0, total))

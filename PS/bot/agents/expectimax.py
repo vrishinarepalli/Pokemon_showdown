@@ -11,6 +11,8 @@ Setup and recovery moves use 2-turn rollouts to capture multi-turn strategies M3
 Acceptance: >=60% winrate vs HeuristicAgent over 500 games.
 """
 
+import os
+
 from poke_env.data import GenData
 from poke_env.player import Player
 
@@ -20,6 +22,54 @@ from bot.value.handcrafted import HandcraftedValue
 
 
 _NORM = 350.0  # move power score → HP fraction; 350 ≈ realistic damage range
+
+# Tunable knobs (defaults reproduce prior behavior; overridable for A/B sweeps).
+# PS_SPE_CONST: IV+EV term in the actual-speed estimate. 94 = 31 IV + 252 EV
+#   (old assumption); 52 = 31 IV + 85 EV (gen9 randbat default, matches _estimate_stat).
+# PS_POOL_DISC: multiplier on damage from UNREVEALED movepool moves when estimating
+#   opponent threat. 1.0 = treat as certain (paranoid); <1 = discount the guess.
+_SPE_IV_EV = float(os.environ.get("PS_SPE_CONST", "94"))   # tuned: 94 (max-EV floor) beat 52
+_POOL_DISC = float(os.environ.get("PS_POOL_DISC", "0.7"))  # tuned: discount unrevealed-move threat
+# Move-eval bonus/penalty knobs (tuned via 1000–3000-game A/B sweeps vs M3).
+_RISK_PEN = float(os.environ.get("PS_RISK_PEN", "0.0"))   # early-game caution hurt vs M3; disabled
+_KO_BONUS = float(os.environ.get("PS_KO_BONUS", "0.45"))  # guaranteed-KO reward
+_NEARKO_BONUS = float(os.environ.get("PS_NEARKO", "0.30"))  # near-KO (roll) reward (lowering hurt)
+_SETUP_BONUS = float(os.environ.get("PS_SETUP_BONUS", "0.0"))  # extra reward for setup (sweep bet vs M3)
+_FSWITCH_OFF = float(os.environ.get("PS_FSWITCH_OFF", "1.0"))  # weight of offense in forced-switch choice
+# 2-ply lookahead: discount applied to the projected NEXT-turn value of attacking
+# moves (KO timing — does our KO hand M3 a revenge-killer? does staying in win the
+# follow-up?). M3 is near-deterministic, so depth-2 has branching factor ~1 and is
+# cheap. A/B vs M3: small discount (0.3) is neutral-to-slightly-positive; >=0.5
+# regresses sharply (a ROUGH evaluator can't carry more lookahead weight). The
+# payoff scales with damage-model accuracy — pair with an accurate calculator to
+# unlock it. 0.0 = pure depth-1.
+_LOOKAHEAD = float(os.environ.get("PS_LOOKAHEAD", "0.3"))
+
+# --- Accurate damage model knobs (defaults = new accurate behavior) ---
+# PS_ROLL: "avg" uses the average damage roll (×0.925) so projected HP is honest
+#   and KO bonuses scale with the TRUE roll-to-KO probability; "max" reproduces the
+#   old behavior (compute the 100% roll, then treat any max-roll KO as guaranteed —
+#   which over-committed the bot to "KOs" that only land on high rolls).
+_ROLL_MODE = os.environ.get("PS_ROLL", "avg")
+_AVG_ROLL = 0.925  # mean of the 16 uniform damage rolls (0.85, 0.86, ... 1.00)
+# PS_MULTIHIT=1 (default) scales multi-hit moves (Bullet Seed, Icicle Spear,
+#   Population Bomb, ...) by poke-env's expected_hits; 0 = single-hit (old behavior).
+_MULTIHIT = os.environ.get("PS_MULTIHIT", "1") != "0"
+# PS_CONTEXT=1 (default) applies weather/terrain/screen damage modifiers inside the
+#   damage formula; 0 ignores them (old behavior).
+_CONTEXT = os.environ.get("PS_CONTEXT", "1") != "0"
+
+# --- Wall-mode exploit knobs (vs a no-switch, status-less M3) ---
+# When we comfortably tank the opponent's best move AND can't just KO it quickly,
+# M3 keeps spamming a move that barely dents us and has no way to cure status,
+# recover, or escape. Reward the long-game tools M3 can't answer (status /
+# recovery / setup) so we convert unbreakable matchups into wins instead of slow
+# even trades. PS_WALL=0 disables (reproduces prior behavior).
+_WALL = os.environ.get("PS_WALL", "0") != "0"  # neutral vs M3 (52.6 vs 52.7); off by default, kept for online/human play
+_WALL_THRESH = float(os.environ.get("PS_WALL_THRESH", "0.18"))   # opp best dmg ≤ this ⇒ walling
+_WALL_BONUS = float(os.environ.get("PS_WALL_BONUS", "0.25"))     # score bonus for stall tools
+_WALL_OUR_MAX = float(os.environ.get("PS_WALL_OUR_MAX", "0.6"))  # skip if our best dmg ≥ this (KO fast instead)
+_WALL_MIN_HP = float(os.environ.get("PS_WALL_MIN_HP", "0.45"))   # only stall when we're healthy enough
 
 # Stealth Rock damage = 1/8 * rock-type effectiveness against switch-in.
 _SR_BASE = 0.125
@@ -242,6 +292,12 @@ def _find_least_valuable_mon(battle) -> tuple:
 class ExpectimaxAgent(Player):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Ablation hook (no effect unless PS_ABLATE is set): comma-list of
+        # strategic categories to neutralize for A/B experiments, e.g.
+        # PS_ABLATE="recovery,setup". An ablated move is scored as a plain
+        # damaging move (_eval_move) so its strategic bonus is removed.
+        import os as _os
+        self._ablate = {c.strip() for c in _os.environ.get("PS_ABLATE", "").split(",") if c.strip()}
         self._value = HandcraftedValue()
         self._opp_power_cache = {}  # (opp_id, our_id, gen) → power
         self._battle_logger = None  # Created per battle
@@ -430,7 +486,25 @@ class ExpectimaxAgent(Player):
         best_order = None
         best_score = float("-inf")
         chosen_action = None
-        best_move_score = float("-inf")
+
+        # Wall-mode exploit (vs M3): if we comfortably tank the opponent's best
+        # move and can't just KO it quickly, M3 will keep spamming a move that
+        # barely dents us — and it can't status, recover, or escape. Reward the
+        # long-game tools M3 has no answer to (status / recovery / setup) so we
+        # convert unbreakable matchups into wins instead of slow even trades.
+        wall_bonus = 0.0
+        if _WALL and battle.active_pokemon is not None and battle.opponent_active_pokemon is not None:
+            _opp_best = self._cached_opp_damage(
+                battle.opponent_active_pokemon, battle.active_pokemon, type_chart
+            )
+            _our_best = self._best_damage_against(
+                battle.active_pokemon, battle.opponent_active_pokemon, battle, type_chart
+            )
+            _our_hp_now = battle.active_pokemon.current_hp_fraction or 0.0
+            if _opp_best <= _WALL_THRESH and _our_hp_now >= _WALL_MIN_HP and _our_best < _WALL_OUR_MAX:
+                # Scale up the weaker their hit is (the more turns we can safely stall).
+                strength = min(1.0, (_WALL_THRESH - _opp_best) / max(_WALL_THRESH, 1e-6))
+                wall_bonus = _WALL_BONUS * (0.5 + 0.5 * strength)
 
         for move in battle.available_moves:
             if (move.current_pp or 0) == 0:
@@ -448,13 +522,13 @@ class ExpectimaxAgent(Player):
             is_hazard = mid in _HAZARD_MOVES
             is_status = mid in _STATUS_MOVES and _STATUS_MOVES[mid] is not None
 
-            if is_setup:
+            if is_setup and "setup" not in self._ablate:
                 result = self._eval_setup_move(move, battle, type_chart)
-            elif is_recovery:
+            elif is_recovery and "recovery" not in self._ablate:
                 result = self._eval_recovery_move(move, battle, type_chart)
-            elif is_hazard:
+            elif is_hazard and "hazard" not in self._ablate:
                 result = self._eval_hazard_move(move, battle, type_chart)
-            elif is_status:
+            elif is_status and "status" not in self._ablate:
                 result = self._eval_status_move(move, battle, type_chart)
             else:
                 result = self._eval_move(move, battle, type_chart)
@@ -462,6 +536,16 @@ class ExpectimaxAgent(Player):
             # Ensure result is _EvalResult; convert float if needed
             if isinstance(result, float):
                 result = _EvalResult(result)
+
+            # Wall-mode: nudge status / recovery / setup above plain trading when
+            # we're walling the opponent. Skips moves the evaluator already vetoed
+            # (-inf), so unsafe setup/status don't get falsely promoted.
+            if (
+                wall_bonus
+                and (is_status or is_recovery or is_setup)
+                and result.score > float("-inf")
+            ):
+                result.score += wall_bonus
 
             self._battle_logger.log_decision(
                 "move", move.id, result.score, our_hp, opp_hp, chosen=False,
@@ -474,14 +558,10 @@ class ExpectimaxAgent(Player):
                 move_category=result.move_category,
                 reasoning=result.reasoning,
             )
-            best_move_score = max(best_move_score, result.score)
-
             if result.score > best_score:
                 best_score = result.score
                 best_order = self.create_order(move)
                 chosen_action = ("move", move.id)
-                if is_setup and result.score > 0.5:
-                    break
 
         for switch in battle.available_switches:
             result = self._eval_switch(switch, battle, type_chart)
@@ -504,6 +584,12 @@ class ExpectimaxAgent(Player):
                 best_score = result.score
                 best_order = self.create_order(switch)
                 chosen_action = ("switch", switch.species)
+
+        # NOTE: an M3-style "switch gate" (require a switch to beat the best move
+        # by a margin) was tested here and REGRESSED winrate at every margin
+        # (0.10→48.3%, 0.15→46.1%, 0.20→45.5%). With the item-multiplier fix the
+        # value model already justifies most switches, so gating them away just
+        # forfeits good pivots. Left ungated deliberately.
 
         # Mark chosen action
         if chosen_action:
@@ -597,6 +683,19 @@ class ExpectimaxAgent(Player):
         atk_boost = boosts.get("atk" if is_physical else "spa", 0)
 
         our_damage = _damage_fraction(move, attacker, defender, type_chart, atk_boost=atk_boost)
+
+        # Symmetry fix: opponent threat (_max_threat_via_movepool) already applies
+        # Choice Band/Specs/Life Orb multipliers, but our own damage didn't — so the
+        # bot systematically undervalued attacking (especially with Choice users) and
+        # over-preferred switching/healing. Mirror the same item multipliers here.
+        our_item = _norm(getattr(attacker, "item", None)) if attacker else ""
+        if is_physical and our_item == "choiceband":
+            our_damage *= 1.5
+        elif (not is_physical) and our_item == "choicespecs":
+            our_damage *= 1.5
+        elif our_item == "lifeorb":
+            our_damage *= 1.3
+
         opp_damage = self._cached_opp_damage(defender, attacker, type_chart)
 
         # Apply Stakeout ability bonus (2x damage if opponent switches)
@@ -639,15 +738,23 @@ class ExpectimaxAgent(Player):
 
             if not is_clearly_winning:
                 # Risky play when we have limited information about opp team
-                risk_penalty = info_deficit * (0.55 - our_after) * 0.6
+                risk_penalty = info_deficit * (0.55 - our_after) * _RISK_PEN
                 base_score -= risk_penalty
 
-        # KO bonus: if this move guarantees KO of the opponent, add significant bonus
-        # because eliminating the threat outright is extremely valuable.
-        ko_bonus = 0.0
-        if opp_after <= 0.0:
-            # Guaranteed KO — opponent can't attack back, clearing the board is huge
-            ko_bonus = 0.30
+        # KO value: expected reward for securing the kill THIS turn, scaled by the
+        # TRUE roll-to-KO probability. This replaces both (a) the old binary
+        # trigger (opp_after <= 0), which fired on the 100% roll and over-committed
+        # the bot to "KOs" that only land on high rolls, and (b) the separate
+        # near-KO heuristic. p_ko = 1.0 only for a guaranteed KO (even the min roll
+        # kills); partial otherwise. Only counts if we actually land the hit: if we
+        # move second and faint first, we deal no damage.
+        goes_first = _we_go_first(move, attacker, defender, battle)
+        acc = _accuracy(move)
+        on_hit = our_damage / acc if acc > 0 else our_damage
+        deals_hit = goes_first or our_after > 0.0
+        p_ko = acc * _ko_probability(on_hit, opp_hp) if deals_hit else 0.0
+        ko_bonus = _KO_BONUS * p_ko
+        near_ko_bonus = 0.0  # subsumed by the p_ko-scaled ko_bonus above
 
         # Doomed-mon bonus: if our active mon will die regardless this turn (opp goes
         # first AND opp_damage >= our_hp), then dying-while-dealing-damage is strictly
@@ -655,18 +762,6 @@ class ExpectimaxAgent(Player):
         # / any damage we can squeeze out of our active mon before fainting.
         # Without this, switching to a "fresh" mon scores higher even though that mon
         # also can't beat the opponent — wasting the dying mon's free attack.
-        # Near-KO bonus: when we go first (priority or speed) and bring opp to within
-        # the damage-roll window of a KO (85-100% of their remaining HP), partially
-        # reward the probability that the actual roll finishes them. This matters most
-        # for priority moves like Extremespeed where the calc may show a hair's-breadth
-        # near-miss but the real roll would KO.
-        near_ko_bonus = 0.0
-        goes_first = _we_go_first(move, attacker, defender, battle)
-        if goes_first and opp_after > 0.0 and opp_hp > 0.0:
-            pct = our_damage / opp_hp
-            if pct >= 0.85:
-                near_ko_bonus = 0.30 * min(1.0, (pct - 0.85) / 0.15)
-
         doomed_bonus = 0.0
         is_doomed = (not goes_first) and opp_damage >= our_hp and our_hp > 0
         if is_doomed and our_damage > 0:
@@ -689,9 +784,14 @@ class ExpectimaxAgent(Player):
             base_score += 0.002  # STAB tiebreaker
         base_score += our_damage * 0.001  # Damage tiebreaker
 
-        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}, ko_bonus={ko_bonus:.3f}, doomed_bonus={doomed_bonus:.3f}, near_ko_bonus={near_ko_bonus:.3f}"
+        # 2-ply lookahead: value the position this move leaves us in next turn
+        # (KO timing — does our KO bring in a revenge-killer? does staying in win
+        # the follow-up exchange?). No-op when _LOOKAHEAD == 0.
+        lookahead = self._lookahead_term(battle, attacker, our_after, defender, opp_after, type_chart)
+
+        reasoning = f"damage_to_opp={our_damage:.3f}, damage_from_opp={opp_damage:.3f}, ko_bonus={ko_bonus:.3f}, doomed_bonus={doomed_bonus:.3f}, near_ko_bonus={near_ko_bonus:.3f}, lookahead={lookahead:.3f}"
         return _EvalResult(
-            base_score + ko_bonus + doomed_bonus + near_ko_bonus,
+            base_score + ko_bonus + doomed_bonus + near_ko_bonus + lookahead,
             damage_dealt=our_damage,
             damage_taken=opp_damage,
             expected_hp_after=our_after,
@@ -822,6 +922,11 @@ class ExpectimaxAgent(Player):
                 score += 0.15  # Strong bonus: opp can't hurt us much
             elif ctx["state"] == "DANGER":
                 score -= 0.10  # Avoid setup when threats loom
+
+        # Setup-sweep bet: M3 can't punish setup (no phazing/priority coordination),
+        # so leaning into boosts when we survive the turn can snowball into a sweep.
+        if _SETUP_BONUS and our_after_t1 > 0.0:
+            score += _SETUP_BONUS
 
         reasoning = f"2-turn setup: +{atk_boost}atk/+{spa_boost}spa, t2_damage={best_our_damage_t2:.3f}, opp_dmg={opp_damage:.3f}, worst_opp_dmg={worst_opp_damage:.3f}"
         return _EvalResult(
@@ -1297,6 +1402,10 @@ class ExpectimaxAgent(Player):
             if our_after <= 0.0:
                 ctx_adj -= 0.30
 
+        # (Removed the old "team resource advantage" term: it summed over the whole
+        # bench and so was identical for every switch candidate in a turn — a flat
+        # switch-vs-move bias that also double-counted team HP already reflected by
+        # score_transition. It only encouraged unwarranted switching.)
         score = base_score + offensive_bonus + info_bonus + ability_bonus + ctx_adj
         reasoning = f"switch_to {pokemon.species}: hazard_dmg={hazard:.3f}, opp_dmg={opp_damage:.3f}, value={_mon_value(pokemon):.3f}, ability_bonus={ability_bonus:.3f}"
         return _EvalResult(
@@ -1344,6 +1453,61 @@ class ExpectimaxAgent(Player):
             best_with_pool = _max_threat_via_movepool(opp, our_pokemon, type_chart, tracker=self._opp_tracker)
             self._opp_power_cache[key] = max(best_revealed, best_with_pool)
         return self._opp_power_cache[key]
+
+    def _projected_value(self, battle, our_mon, our_hp, opp_mon, opp_hp, type_chart) -> float:
+        """Depth-1 value of a PROJECTED position: our_mon (at our_hp) facing
+        opp_mon (at opp_hp), assuming we play our best damaging move and M3 plays
+        max-damage. Used as the next-ply estimate for 2-ply lookahead. M3 is
+        near-deterministic so a single projected exchange is a good continuation.
+        """
+        if our_mon is None or opp_mon is None:
+            return 0.0
+        our_dmg = _best_our_damage_with_item(our_mon, opp_mon, type_chart)
+        opp_dmg = _max_threat_via_movepool(opp_mon, our_mon, type_chart, tracker=self._opp_tracker)
+        our_spe = _effective_speed(our_mon, use_actual=True)
+        opp_spe = _effective_speed(opp_mon, use_actual=False)
+        we_first = our_spe <= opp_spe if _trick_room_active(battle) else our_spe >= opp_spe
+        if we_first:
+            opp_after = max(0.0, opp_hp - our_dmg)
+            our_after = max(0.0, our_hp - (opp_dmg if opp_after > 0.0 else 0.0))
+        else:
+            our_after = max(0.0, our_hp - opp_dmg)
+            opp_after = max(0.0, opp_hp - (our_dmg if our_after > 0.0 else 0.0))
+        val = self._value.score_transition(battle, our_after, opp_after)
+        if opp_after <= 0.0:
+            val += 0.15
+        if our_after <= 0.0:
+            val -= 0.10
+        return val
+
+    def _lookahead_term(self, battle, attacker, our_after, defender, opp_after, type_chart) -> float:
+        """2-ply continuation value for an attacking move that leaves us at
+        our_after HP and the opponent at opp_after HP. Models what happens NEXT:
+          - opp fainted  → M3 sends in its best matchup mon; do we survive/threaten it?
+          - both survive → the next exchange vs the same (damaged) opponent.
+          - we fainted   → we bring in our best switch-in to face the opponent.
+        Returns the discounted projected value (0 when lookahead disabled)."""
+        if _LOOKAHEAD <= 0.0 or attacker is None or defender is None:
+            return 0.0
+        if opp_after <= 0.0:
+            if our_after <= 0.0:
+                return 0.0  # mutual KO — even trade, neutral continuation
+            send_in = _predict_opp_switch_in(battle, attacker, type_chart, tracker=self._opp_tracker)
+            if send_in is None:
+                return 0.0  # opp has no bench left → we're cleaning up, no penalty
+            cont = self._projected_value(
+                battle, attacker, our_after, send_in,
+                send_in.current_hp_fraction if send_in.current_hp_fraction else 1.0, type_chart)
+            return _LOOKAHEAD * cont
+        if our_after > 0.0:
+            cont = self._projected_value(battle, attacker, our_after, defender, opp_after, type_chart)
+            return _LOOKAHEAD * cont
+        # our active faints, opp survives → our best switch-in faces the opponent
+        if battle.available_switches:
+            sw = _best_forced_switch(battle, type_chart, tracker=self._opp_tracker)
+            cont = self._projected_value(battle, sw, sw.current_hp_fraction, defender, opp_after, type_chart)
+            return _LOOKAHEAD * cont
+        return 0.0
 
 
 def _move_power(move, attacker, defender, type_chart) -> float:
@@ -1446,11 +1610,12 @@ def _effective_speed(pokemon, use_actual: bool) -> float:
 def _estimate_actual_speed(base_stat: int, level: int) -> float:
     """Rough max-EV/IV actual stat approximation.
 
-    Level 80, 31 IV, 252 EV, neutral nature: ((2*base + 31 + 63) * 80) / 100 + 5.
+    31 IV + EV term (_SPE_IV_EV; 94≈252 EV, 52≈85 EV randbat default), neutral
+    nature: ((2*base + _SPE_IV_EV) * level) / 100 + 5.
     Good enough for speed comparisons in random battles where we don't know
     the opponent's exact EV spread.
     """
-    return ((2 * base_stat + 94) * level) / 100.0 + 5.0
+    return ((2 * base_stat + _SPE_IV_EV) * level) / 100.0 + 5.0
 
 
 def _hazard_damage(pokemon, side_conditions, type_chart) -> float:
@@ -1862,6 +2027,7 @@ def _max_threat_via_movepool(opp_mon, our_pokemon, type_chart, tracker=None) -> 
                 boost = opp_boosts.get("atk" if _is_physical_move(m) else "spa", 0)
                 d = _damage_fraction(m, opp_mon, our_pokemon, type_chart, atk_boost=boost)
                 d *= _item_mult(_is_physical_move(m))
+                d *= _POOL_DISC  # discount: this move is a guess, not revealed
                 best = max(best, d)
             except Exception:
                 continue
@@ -1945,7 +2111,11 @@ def _best_forced_switch(battle, type_chart, tracker=None):
                     if mult >= 2.0:
                         type_penalty = 1.0  # Hard penalty: don't pick a 2x weak mon if avoidable
                         break
-        return p.current_hp_fraction - hazard - threat - type_penalty
+        # Offense matters too: a mon that merely SURVIVES but can't threaten the
+        # opponent loses the 1v1 by attrition. Reward switch-ins that can hit back
+        # (super-effective STAB, or faster + can KO). Reuses _switch_offensive_bonus.
+        offense = _switch_offensive_bonus(p, opp, type_chart) if opp is not None else 0.0
+        return p.current_hp_fraction - hazard - threat - type_penalty + _FSWITCH_OFF * offense
 
     return max(battle.available_switches, key=score)
 
@@ -2042,7 +2212,7 @@ def _ability_status_multiplier(attacker, is_physical: bool, move_id: str = "") -
     return mult
 
 
-def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -> float:
+def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0, battle=None) -> float:
     """Estimate damage as fraction of defender's HP using real Gen 9 formula.
 
     atk_boost: stage count to apply to attacker's attack stat (for setup rollouts
@@ -2051,17 +2221,49 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
     interactions (Guts, burn penalty, Toxic Boost, Flare Boost) are applied
     automatically.
 
+    battle: when provided (and PS_CONTEXT enabled), weather/terrain/screen
+    modifiers are applied. Defaults to None for callers that don't have it.
+
+    Damage roll: returns the AVERAGE-roll expected damage (×0.925) by default so
+    projected HP is honest; PS_ROLL="max" reproduces the old 100%-roll value.
+    Multi-hit moves are scaled by expected hits; fixed-damage moves (Seismic
+    Toss/Night Shade/Super Fang) are handled explicitly.
+
     Critical hits: ignores base 6.25% crit rate (random anomaly). Only accounts
     for high-crit moves (12.5%+) or guaranteed crits.
 
     Returns fraction in [0, 1+] (may exceed 1 for OHKOs).
     """
-    bp = move.base_power or 0
-    if bp <= 0 or attacker is None or defender is None:
+    if attacker is None or defender is None:
         return 0.0
 
     level = getattr(attacker, "level", None) or 80
     is_physical = _is_physical_move(move)
+    move_id = _norm(getattr(move, "id", ""))
+
+    # Fixed-damage moves: base_power is 0 in the data but they still deal damage.
+    # They respect type immunity (Fighting Seismic Toss misses Ghost; Ghost Night
+    # Shade misses Normal). Super Fang deals 50% of the target's CURRENT HP.
+    fixed = getattr(move, "damage", None)
+    if fixed or move_id == "superfang":
+        eff_im = move.type.damage_multiplier(
+            defender.type_1, defender.type_2, type_chart=type_chart
+        )
+        if eff_im == 0:
+            return 0.0
+        acc = _accuracy(move)
+        if move_id == "superfang":
+            return 0.5 * (defender.current_hp_fraction or 1.0) * acc
+        hp = _estimate_hp(defender)
+        if fixed == "level":
+            return (level / hp) * acc
+        if isinstance(fixed, (int, float)):
+            return (float(fixed) / hp) * acc
+
+    bp = move.base_power or 0
+    if bp <= 0:
+        return 0.0
+
     atk_name = "atk" if is_physical else "spa"
     def_name = "def" if is_physical else "spd"
 
@@ -2093,11 +2295,16 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
 
     base_damage = ((2 * level / 5 + 2) * bp * A / D) / 50 + 2
 
-    # High-crit rate handling: only apply if move has guaranteed or 12.5%+ crit rate
+    # High-crit rate handling, as an EXPECTED-VALUE multiplier (not a flat 1.5x,
+    # which overvalued high-crit moves by ~41%). A crit deals 1.5x, so EV uplift =
+    # 1 + 0.5 * P(crit). Elevated-crit moves (~12.5%) → ~1.0625x; near-guaranteed
+    # high-crit tiers → ~1.125x.
     crit_mult = 1.0
     crit_rate = getattr(move, "crit_ratio", 0) or 0
-    if crit_rate >= 2:  # 12.5% or higher
-        crit_mult = 1.5
+    if crit_rate >= 3:
+        crit_mult = 1.125
+    elif crit_rate >= 2:
+        crit_mult = 1.0625
 
     # Ability interactions: immunity, healing, damage reduction
     # E.g., Water Absorb on water moves = 0 damage + heal
@@ -2111,7 +2318,155 @@ def _damage_fraction(move, attacker, defender, type_chart, atk_boost: int = 0) -
         return 0.0
 
     damage = base_damage * stab * eff * acc * crit_mult * ability_mult / hp
+
+    # Multi-hit moves (Bullet Seed, Icicle Spear, Population Bomb, ...): base_power
+    # is per-hit, so scale by the expected number of hits (poke-env exposes this).
+    if _MULTIHIT:
+        hits = getattr(move, "expected_hits", 1) or 1
+        if hits != 1:
+            damage *= hits
+
+    # Weather / terrain / screen modifiers (only when battle context is supplied).
+    if _CONTEXT and battle is not None:
+        damage *= _context_damage_mult(move, attacker, defender, battle, is_physical, eff)
+
+    # Average damage roll → honest expected damage. "max" keeps the old 100% roll.
+    if _ROLL_MODE == "avg":
+        damage *= _AVG_ROLL
+
     return damage
+
+
+def _ko_probability(on_hit_avg_frac: float, target_hp_frac: float) -> float:
+    """P(KO | the move hits), scanning the 16 uniform damage rolls (0.85..1.00).
+
+    on_hit_avg_frac: average-roll damage as a fraction of the target's MAX HP
+        (i.e. _damage_fraction output with the accuracy factor divided back out).
+    target_hp_frac: the target's CURRENT remaining HP fraction.
+
+    Returns 1.0 for a guaranteed KO (even the min roll kills), down to 0.0.
+    """
+    if on_hit_avg_frac <= 0.0 or target_hp_frac <= 0.0:
+        return 0.0
+    max_roll = on_hit_avg_frac / _AVG_ROLL  # damage at the 1.00 roll
+    kos = sum(1 for i in range(16) if max_roll * (0.85 + i * 0.01) >= target_hp_frac)
+    return kos / 16.0
+
+
+def _has_type(mon, type_name_upper: str) -> bool:
+    if not mon:
+        return False
+    for t in (mon.type_1, mon.type_2):
+        if t is not None and getattr(t, "name", str(t)).upper() == type_name_upper:
+            return True
+    return False
+
+
+def _context_damage_mult(move, attacker, defender, battle, is_physical: bool, type_eff: float) -> float:
+    """Weather / terrain / screen damage multiplier for the current field state."""
+    mult = 1.0
+    mtype = getattr(move.type, "name", str(move.type)).upper()
+    move_id = _norm(getattr(move, "id", ""))
+
+    # --- Weather ---
+    try:
+        from poke_env.battle.weather import Weather
+        weather = set((battle.weather or {}).keys())
+    except Exception:
+        weather = set()
+    if weather:
+        if Weather.SUNNYDAY in weather or Weather.DESOLATELAND in weather:
+            if mtype == "FIRE":
+                mult *= 1.5
+            elif mtype == "WATER":
+                mult *= 0.5
+        if Weather.RAINDANCE in weather or Weather.PRIMORDIALSEA in weather:
+            if mtype == "WATER":
+                mult *= 1.5
+            elif mtype == "FIRE":
+                mult *= 0.5
+        # Sandstorm: Rock-types get +50% SpD (special damage to them ×0.667).
+        if Weather.SANDSTORM in weather and not is_physical and _has_type(defender, "ROCK"):
+            mult *= 1.0 / 1.5
+        # Snow: Ice-types get +50% Def (physical damage to them ×0.667).
+        if Weather.SNOWSCAPE in weather and is_physical and _has_type(defender, "ICE"):
+            mult *= 1.0 / 1.5
+
+    # --- Terrain ---
+    try:
+        from poke_env.battle.field import Field
+        fields = set((battle.fields or {}).keys())
+    except Exception:
+        fields = set()
+    if fields:
+        if _grounded(attacker):
+            if Field.ELECTRIC_TERRAIN in fields and mtype == "ELECTRIC":
+                mult *= 1.3
+            if Field.GRASSY_TERRAIN in fields and mtype == "GRASS":
+                mult *= 1.3
+            if Field.PSYCHIC_TERRAIN in fields and mtype == "PSYCHIC":
+                mult *= 1.3
+        if _grounded(defender):
+            if Field.MISTY_TERRAIN in fields and mtype == "DRAGON":
+                mult *= 0.5
+            if Field.GRASSY_TERRAIN in fields and move_id in ("earthquake", "bulldoze", "magnitude"):
+                mult *= 0.5
+
+    # --- Screens (on the DEFENDER's side; singles → halve the relevant category) ---
+    side = None
+    try:
+        if defender is battle.opponent_active_pokemon:
+            side = battle.opponent_side_conditions
+        elif defender is battle.active_pokemon:
+            side = battle.side_conditions
+        else:
+            oa = battle.opponent_active_pokemon
+            side = (battle.opponent_side_conditions
+                    if (oa and defender.species == oa.species)
+                    else battle.side_conditions)
+    except Exception:
+        side = None
+    if side:
+        try:
+            from poke_env.battle.side_condition import SideCondition
+            keys = set(side.keys())
+            veil = SideCondition.AURORA_VEIL in keys
+            if (is_physical and (SideCondition.REFLECT in keys or veil)) or \
+               ((not is_physical) and (SideCondition.LIGHT_SCREEN in keys or veil)):
+                mult *= 0.5
+        except Exception:
+            pass
+
+    return mult
+
+
+def _item_damage_mult(mon, is_physical: bool) -> float:
+    """Damage multiplier from OUR mon's KNOWN held item (Choice Band/Specs, Life Orb)."""
+    item = _norm(getattr(mon, "item", None)) if mon else ""
+    if is_physical and item == "choiceband":
+        return 1.5
+    if (not is_physical) and item == "choicespecs":
+        return 1.5
+    if item == "lifeorb":
+        return 1.3
+    return 1.0
+
+
+def _best_our_damage_with_item(our_mon, opp_mon, type_chart) -> float:
+    """Best damage fraction our_mon can deal to opp_mon across its (known) moves,
+    applying our item multiplier and current offensive boosts."""
+    if not our_mon or not opp_mon:
+        return 0.0
+    boosts = our_mon.boosts or {}
+    best = 0.0
+    for m in our_mon.moves.values():
+        if (m.base_power or 0) <= 0:
+            continue
+        is_phys = _is_physical_move(m)
+        boost = boosts.get("atk" if is_phys else "spa", 0)
+        d = _damage_fraction(m, our_mon, opp_mon, type_chart, atk_boost=boost) * _item_damage_mult(our_mon, is_phys)
+        best = max(best, d)
+    return best
 
 
 def _max_opp_damage_fraction(opp, our_pokemon, type_chart) -> float:
@@ -2200,6 +2555,11 @@ def _switch_offensive_bonus(pokemon, opp, type_chart) -> float:
     if not opp or not pokemon:
         return 0.0
 
+    from poke_env.battle.move import Move as PEMove
+    from bot.data.sets_db import get_movepool
+
+    revealed_ids = {m.id for m in pokemon.moves.values()}
+
     # Find best damaging move from switch-in's revealed moves
     best_dmg = 0.0
     has_se_stab = False
@@ -2217,9 +2577,31 @@ def _switch_offensive_bonus(pokemon, opp, type_chart) -> float:
         if eff >= 2.0 and stab == 1.5:
             has_se_stab = True
 
+    # Fill unrevealed move slots from sets DB — mirrors _max_threat_via_movepool.
+    # Discounted vs confirmed moves since it's a worst-case estimate, not guaranteed.
+    if len(revealed_ids) < 4:
+        for move_id in get_movepool(pokemon.species):
+            if move_id in revealed_ids:
+                continue
+            try:
+                m = PEMove(move_id, gen=9)
+            except Exception:
+                continue
+            if (m.base_power or 0) <= 0:
+                continue
+            try:
+                stab = 1.5 if m.type in pokemon.types else 1.0
+                eff = m.type.damage_multiplier(opp.type_1, opp.type_2, type_chart=type_chart)
+                d = _damage_fraction(m, pokemon, opp, type_chart) * 0.7  # discount: not confirmed
+                best_dmg = max(best_dmg, d)
+                if eff >= 2.0 and stab == 1.5:
+                    has_se_stab = True
+            except Exception:
+                continue
+
     bonus = 0.0
     if has_se_stab:
-        bonus = 0.15  # Has super-effective STAB
+        bonus = 0.15  # Has super-effective STAB (confirmed or likely from pool)
 
     # Speed check: faster switch-in that can KO is huge — opp dies before they
     # get another turn. We outspeed = first move = guaranteed damage applied.

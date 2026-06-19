@@ -8,27 +8,18 @@ Used by threat calculations to predict opp moves more accurately than the
 full unfiltered movepool.
 """
 
-import json
 from typing import Dict, List, Optional, Set
 
-_SETS_PATH = "/home/user/Pokemon_showdown/node_modules/pokemon-showdown/data/random-battles/gen9/sets.json"
-
-_sets_cache: Optional[dict] = None
+# Share sets_db's resolver: it prefers the bundled gen9_randbat_sets.json and
+# falls back to npm-installed pokemon-showdown. The old hardcoded /home/user
+# path never existed off the original dev box, so the tracker silently loaded
+# an EMPTY db — which made get_likely_moves() return only already-revealed
+# moves, defeating the whole point of movepool-based threat prediction.
+from bot.data.sets_db import _load as _load_sets_db
 
 
 def _norm(s: str) -> str:
     return (s or "").lower().replace(" ", "").replace("-", "").replace("'", "")
-
-
-def _load_sets_db() -> dict:
-    global _sets_cache
-    if _sets_cache is None:
-        try:
-            with open(_SETS_PATH) as f:
-                _sets_cache = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            _sets_cache = {}
-    return _sets_cache
 
 
 def _lookup_sets(species: str) -> List[dict]:
