@@ -1,6 +1,0 @@
-Battles:   0%|          | 0/3 [00:00<?, ?battle/s]Battles:  33%|███▎      | 1/3 [00:00<00:00,  7.38battle/s]Battles:  33%|███▎      | 1/3 [00:00<00:00,  7.38battle/s, wins=0/1 (0.0%)]Battles:  67%|██████▋   | 2/3 [00:00<00:00,  8.27battle/s, wins=0/1 (0.0%)]Battles:  67%|██████▋   | 2/3 [00:00<00:00,  8.27battle/s, wins=0/2 (0.0%)]Battles: 100%|██████████| 3/3 [00:00<00:00,  8.27battle/s, wins=0/3 (0.0%)]Battles: 100%|██████████| 3/3 [00:00<00:00,  9.28battle/s, wins=0/3 (0.0%)]
-
-expectimax vs heuristic: 0 / 3 wins (0.0%)
-Time elapsed: 0.3s (0.1s per battle)
-
-Battle logs saved to ./battle_logs.json

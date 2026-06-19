@@ -19,8 +19,9 @@ analysis.txt
 first_5_turns.json
 battle_logs.json
 
-# Replays (large, not needed in source control)
+# Replays / battle dumps (large, regenerated on every run)
 replays/
+battle_teams/
 
 # Node
 node_modules/
