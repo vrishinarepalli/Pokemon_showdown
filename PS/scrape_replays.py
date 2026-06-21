@@ -13,14 +13,19 @@ API (verified 2026-06-21):
 Stdlib only (urllib/json) — no deps. Polite (rate-limited) and resumable:
 re-running skips replays already in the output file, so you accumulate over days.
 
+Storage: plain JSONL, ~11 KB/replay (5k ~= 55 MB). It's transient working data —
+the BC parser turns it into compact tensors, then the raw can be deleted. Plain
+(not gzip) on purpose: line-append is crash-safe and readable mid-run; a killed
+run leaves at most one torn last line, which resume skips. Want it smaller at
+rest? `gzip` the finished file (~5x).
+
 Usage (from PS/):
-    python scrape_replays.py --max 500
-    python scrape_replays.py --max 2000 --min-rating 1500   # skilled play only
-    python scrape_replays.py --demo                          # offline self-check
+    python scrape_replays.py --max 5000 --min-rating 1500   # skilled play
+    python scrape_replays.py --max 500                      # keep all ratings
+    python scrape_replays.py --demo                         # offline self-check
 """
 
 import argparse
-import gzip
 import json
 import os
 import time
@@ -30,14 +35,8 @@ import urllib.request
 FORMAT = "gen9randombattle"
 SEARCH_URL = "https://replay.pokemonshowdown.com/search.json"
 REPLAY_URL = "https://replay.pokemonshowdown.com/{id}.json"
-# gzipped by default — text compresses ~5x, so a big dataset stays tens of MB.
-DEFAULT_OUT = os.path.join(os.path.dirname(__file__), "data", "replays", f"{FORMAT}.jsonl.gz")
+DEFAULT_OUT = os.path.join(os.path.dirname(__file__), "data", "replays", f"{FORMAT}.jsonl")
 _KEEP = ("id", "format", "players", "rating", "uploadtime", "log", "inputlog")
-
-
-def _open(path, mode):
-    """Open plain or gzipped by extension, always text (utf-8)."""
-    return gzip.open(path, mode + "t", encoding="utf-8") if path.endswith(".gz") else open(path, mode)
 
 
 def _fetch(url, retries=3, delay=0.4):
@@ -47,22 +46,23 @@ def _fetch(url, retries=3, delay=0.4):
             req = urllib.request.Request(url, headers={"User-Agent": "ps-bot-research/1.0"})
             with urllib.request.urlopen(req, timeout=20) as r:
                 return json.load(r)
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
             if attempt == retries - 1:
                 raise
             time.sleep(delay * (attempt + 2))  # ponytail: linear backoff, exponential if it matters
 
 
 def _load_seen(path):
-    """Resume support: ids already saved, so a re-run only fetches new replays."""
+    """Resume support: ids already saved, so a re-run only fetches new replays.
+    A killed run leaves at most one torn last line — skipped, not fatal."""
     seen = set()
     if os.path.exists(path):
-        with _open(path, "r") as f:
+        with open(path) as f:
             for line in f:
                 try:
                     seen.add(json.loads(line)["id"])
                 except (json.JSONDecodeError, KeyError):
-                    continue  # skip a torn last line from an interrupted run
+                    continue
     return seen
 
 
@@ -86,7 +86,7 @@ def scrape(out_path, max_replays, min_rating, delay):
 
     saved = 0
     before = None  # pagination cursor: uploadtime of the oldest result so far
-    with _open(out_path, "a") as out:
+    with open(out_path, "a") as out:
         while saved < max_replays:
             url = f"{SEARCH_URL}?format={FORMAT}"
             if before is not None:
@@ -108,11 +108,11 @@ def scrape(out_path, max_replays, min_rating, delay):
                 rec = {k: full.get(k) for k in _KEEP}
                 rec["rating"] = meta.get("rating")  # search metadata is authoritative; replay json rating is often null
                 out.write(json.dumps(rec) + "\n")
-                out.flush()
+                out.flush()  # per-line durability: a kill loses nothing already written
                 seen.add(meta["id"])
                 saved += 1
                 if saved % 25 == 0:
-                    print(f"  saved {saved}/{max_replays} (rating {meta.get('rating')})")
+                    print(f"  saved {saved}/{max_replays} (rating {meta.get('rating')})", flush=True)
                 time.sleep(delay)  # ponytail: be a good citizen on a community server
 
     print(f"Done: +{saved} replays this run, {len(seen)} total at {out_path}")
@@ -126,12 +126,9 @@ def _demo():
         {"id": "c", "rating": 1200},
         {"id": "d", "rating": 2000},
     ]
-    # no floor, nothing seen -> all new pass
-    assert [r["id"] for r in _select(page, 0, set())] == ["a", "b", "c", "d"]
-    # floor 1500 drops unrated + low
-    assert [r["id"] for r in _select(page, 1500, set())] == ["a", "d"]
-    # already-seen is skipped
-    assert [r["id"] for r in _select(page, 0, {"a", "c"})] == ["b", "d"]
+    assert [r["id"] for r in _select(page, 0, set())] == ["a", "b", "c", "d"]      # no floor -> all new
+    assert [r["id"] for r in _select(page, 1500, set())] == ["a", "d"]            # floor drops unrated + low
+    assert [r["id"] for r in _select(page, 0, {"a", "c"})] == ["b", "d"]          # seen are skipped
     print("demo OK")
 
 
