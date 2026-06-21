@@ -20,6 +20,7 @@ Usage (from PS/):
 """
 
 import argparse
+import gzip
 import json
 import os
 import time
@@ -29,8 +30,14 @@ import urllib.request
 FORMAT = "gen9randombattle"
 SEARCH_URL = "https://replay.pokemonshowdown.com/search.json"
 REPLAY_URL = "https://replay.pokemonshowdown.com/{id}.json"
-DEFAULT_OUT = os.path.join(os.path.dirname(__file__), "data", "replays", f"{FORMAT}.jsonl")
+# gzipped by default — text compresses ~5x, so a big dataset stays tens of MB.
+DEFAULT_OUT = os.path.join(os.path.dirname(__file__), "data", "replays", f"{FORMAT}.jsonl.gz")
 _KEEP = ("id", "format", "players", "rating", "uploadtime", "log", "inputlog")
+
+
+def _open(path, mode):
+    """Open plain or gzipped by extension, always text (utf-8)."""
+    return gzip.open(path, mode + "t", encoding="utf-8") if path.endswith(".gz") else open(path, mode)
 
 
 def _fetch(url, retries=3, delay=0.4):
@@ -50,7 +57,7 @@ def _load_seen(path):
     """Resume support: ids already saved, so a re-run only fetches new replays."""
     seen = set()
     if os.path.exists(path):
-        with open(path) as f:
+        with _open(path, "r") as f:
             for line in f:
                 try:
                     seen.add(json.loads(line)["id"])
@@ -79,7 +86,7 @@ def scrape(out_path, max_replays, min_rating, delay):
 
     saved = 0
     before = None  # pagination cursor: uploadtime of the oldest result so far
-    with open(out_path, "a") as out:
+    with _open(out_path, "a") as out:
         while saved < max_replays:
             url = f"{SEARCH_URL}?format={FORMAT}"
             if before is not None:
@@ -99,6 +106,7 @@ def scrape(out_path, max_replays, min_rating, delay):
                     print(f"  [skip] {meta['id']}: {e}")
                     continue
                 rec = {k: full.get(k) for k in _KEEP}
+                rec["rating"] = meta.get("rating")  # search metadata is authoritative; replay json rating is often null
                 out.write(json.dumps(rec) + "\n")
                 out.flush()
                 seen.add(meta["id"])
