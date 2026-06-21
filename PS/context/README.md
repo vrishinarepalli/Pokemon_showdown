@@ -4,7 +4,7 @@ Conversation context snapshots, one topic per file. Read this TOC, then open
 only the file(s) you need. Keep these updated as decisions change — they are
 the durable memory of *why*, not just *what* (the code is the *what*).
 
-Last updated: 2026-06-21
+Last updated: 2026-06-21 (PIVOT: LLM shelved → BC on scraped replays; see 07)
 
 | File | What's in it |
 |------|--------------|

@@ -1,5 +1,15 @@
 # 07 — Decisions & Open Questions
 
+## 2026-06-21 — PIVOT: LLM shelved → ML (BC on replays)
+Groq's daily token cap makes the M5 LLM path impossible to iterate on consistently,
+so we SHELVED it (kept in repo, not deleted) and committed to local ML.
+- **Chosen:** behavioral cloning on scraped human replays → a learned value function
+  that drops into expectimax (replaces `handcrafted.py`). Hits the proven ceiling (the
+  decision policy), runs locally with no token cap, and the replays supply the
+  playstyle diversity self-play vs M4 never had. Prior art: metamon.
+- **GFlowNets reconsidered and rejected again** — still the wrong shape (see 04).
+- **Done:** `scrape_replays.py` (data step). **Next:** logs→(state,action) pairs → train.
+
 ## Rejected
 - **Genetic/beam-search multi-agent workflow** (Opus orchestrator + analyzer/
   implementer/checker subagents spawning & pruning branches in waves).
