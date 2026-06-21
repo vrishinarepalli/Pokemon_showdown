@@ -23,6 +23,7 @@ from bot.agents.expectimax import (
     _we_go_first,
 )
 from bot.llm.client import GroqClient
+from bot.llm.decision_cache import shared_cache
 from bot.llm.tools import analyze_move, analyze_switch, battle_summary
 
 # Take a KO without asking the LLM if it's this likely AND we move first.
@@ -37,14 +38,18 @@ _SYSTEM = (
 
 # Set PS_LLM_OFF=1 to run the harness on the heuristic fallback only (no API calls).
 _LLM_OFF = os.environ.get("PS_LLM_OFF", "0") != "0"
+# Set PS_CACHE_OFF=1 to bypass the decision cache (every fork re-queries the LLM).
+_CACHE_OFF = os.environ.get("PS_CACHE_OFF", "0") != "0"
 
 
 class LLMAgent(Player):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._client = None if _LLM_OFF else GroqClient()
+        self._cache = None if _CACHE_OFF else shared_cache()
         self._opp_tracker = None
         self.n_llm = 0          # fork turns the LLM decided
+        self.n_cache = 0        # fork turns answered from the decision cache (no LLM)
         self.n_fastpath = 0     # forced / obvious-KO turns
         self.n_gate = 0         # non-fork turns played by the heuristic (no LLM)
         self.n_fallback = 0     # fork turns where the LLM errored -> heuristic
@@ -87,11 +92,27 @@ class LLMAgent(Player):
         # On the ~80% of turns where "use the best move" is correct, play the
         # heuristic — no LLM call, downside bounded to the ~50% floor, tokens saved.
         summary = battle_summary(battle, type_chart, tracker=self._opp_tracker)
-        if self._client is None or not self._is_strategic_fork(candidates, summary):
+        feats = self._fork_features(candidates, summary)
+        fork = self._fork_type(feats)
+        if self._client is None or not fork:
             self.n_gate += 1
             return self.create_order(self._heuristic_choice(candidates, battle, type_chart))
 
         anchor = self._heuristic_index(candidates)
+
+        # Decision cache: a recurring abstracted fork is a dict lookup, not an LLM
+        # call. We cache the EFFECTIVE abstract action (anchor/switch/setup/stall)
+        # and re-resolve it to a concrete candidate in the current battle. If the
+        # cached action isn't available now, fall through and ask the LLM.
+        sig = self._fork_signature(fork, feats, summary)
+        if self._cache is not None:
+            cached = self._cache.get(sig)
+            if cached is not None:
+                order = self._resolve_action(cached, candidates, anchor)
+                if order is not None:
+                    self.n_cache += 1
+                    return self.create_order(order)
+
         idx = self._ask_llm(battle, type_chart, candidates, anchor, summary)
         if idx is None or not (0 <= idx < len(candidates)):
             self.n_fallback += 1
@@ -104,9 +125,13 @@ class LLMAgent(Player):
         if (chosen["kind"] == "move" and idx != anchor
                 and not (self._is_setup(chosen["order"]) or self._is_stall(chosen["order"]))):
             self.n_gate += 1
-            return self.create_order(self._heuristic_choice(candidates, battle, type_chart))
-        self.n_llm += 1
-        return self.create_order(chosen["order"])
+            action, order = "anchor", self._heuristic_choice(candidates, battle, type_chart)
+        else:
+            self.n_llm += 1
+            action, order = self._abstract_action(chosen), chosen["order"]
+        if self._cache is not None:
+            self._cache.put(sig, action)  # remember the effective action for this fork
+        return self.create_order(order)
 
     @staticmethod
     def _is_setup(move) -> bool:
@@ -121,29 +146,84 @@ class LLMAgent(Player):
         mid = _norm(getattr(move, "id", ""))
         return mid in _RECOVERY_MOVES or (mid in _STATUS_MOVES and _STATUS_MOVES[mid] is not None)
 
-    def _is_strategic_fork(self, candidates, summary) -> bool:
-        """True only when deviating from the max-damage move could plausibly win
-        more AND a good alternative actually exists — the spots where the myopic
-        expectimax is weak. Kept strict so the LLM fires on a minority of turns."""
+    def _fork_features(self, candidates, summary) -> dict:
+        """Decision-relevant features of the current spot, computed once and used
+        by BOTH the fork gate and the cache signature (so they never disagree)."""
         moves = [c for c in candidates if c["kind"] == "move"]
         switches = [c for c in candidates if c["kind"] == "switch"]
         dmg = [c["info"]["expected_dmg_pct"] for c in moves if c["info"]["category"] != "status"]
-        our_best = max(dmg) if dmg else 0.0
-        has_setup = any(self._is_setup(c["order"]) for c in moves)
-        has_stall = any(self._is_stall(c["order"]) for c in moves)
-        safe_switch = any(c["info"]["incoming_dmg_pct"] < 35 for c in switches)
-        opp_can_ko = summary["opp_can_ko_us"]
-        opp_hit = summary["opp_best_dmg_to_us_pct"]
+        return {
+            "our_best": max(dmg) if dmg else 0.0,
+            "has_setup": any(self._is_setup(c["order"]) for c in moves),
+            "has_stall": any(self._is_stall(c["order"]) for c in moves),
+            "safe_switch": any(c["info"]["incoming_dmg_pct"] < 35 for c in switches),
+            "opp_can_ko": summary["opp_can_ko_us"],
+            "opp_hit": summary["opp_best_dmg_to_us_pct"],
+        }
 
-        if opp_can_ko and safe_switch:                       # (1) flee danger to a wall
-            return True
-        if has_setup and opp_hit < 25 and our_best < 70:     # (2) safe setup window
-            return True
-        if our_best < 25 and (safe_switch or has_stall):     # (3) walled / stuck
-            return True
-        if has_stall and opp_hit < 30 and our_best < 45:     # (4) stall window
-            return True
-        return False
+    @staticmethod
+    def _fork_type(f) -> int:
+        """0 = not a fork (use heuristic, no LLM); 1-4 = which strategic fork fired
+        — the spots where the myopic expectimax is weak. Returns an id (not a bool)
+        so the decision cache can key on the fork kind."""
+        if f["opp_can_ko"] and f["safe_switch"]:                          # (1) flee danger to a wall
+            return 1
+        if f["has_setup"] and f["opp_hit"] < 25 and f["our_best"] < 70:   # (2) safe setup window
+            return 2
+        if f["our_best"] < 25 and (f["safe_switch"] or f["has_stall"]):   # (3) walled / stuck
+            return 3
+        if f["has_stall"] and f["opp_hit"] < 30 and f["our_best"] < 45:   # (4) stall window
+            return 4
+        return 0
+
+    # ---- decision-cache helpers ----
+    @staticmethod
+    def _bucket(x, edges) -> int:
+        for i, e in enumerate(edges):
+            if x < e:
+                return i
+        return len(edges)
+
+    def _fork_signature(self, fork, feats, summary) -> str:
+        """Canonical, coarse key for an abstracted fork. Two situations with the
+        same signature get the same cached action — coarse enough to recur often,
+        specific enough to stay safe (carries every decision-relevant feature)."""
+        ob = self._bucket(feats["our_best"], (25, 45, 70, 100))
+        oh = self._bucket(feats["opp_hit"], (25, 30, 35, 60))
+        our_hp = self._bucket(summary["our_active"]["hp_pct"], (33, 66))
+        opp_hp = self._bucket(summary["opp_active"]["hp_pct"] or 0, (33, 66))
+        ours, theirs = summary["our_remaining"], summary["opp_remaining"]
+        team = (ours > theirs) - (ours < theirs)  # -1 behind / 0 even / +1 ahead
+        return (f"f{fork}|ko{int(feats['opp_can_ko'])}|fst{int(summary['we_move_first'])}"
+                f"|ob{ob}|oh{oh}|sw{int(feats['safe_switch'])}|set{int(feats['has_setup'])}"
+                f"|stl{int(feats['has_stall'])}|hp{our_hp}{opp_hp}|t{team}")
+
+    def _abstract_action(self, candidate) -> str:
+        """Classify a chosen candidate into the LLM's value-add buckets."""
+        if candidate["kind"] == "switch":
+            return "switch"
+        if self._is_setup(candidate["order"]):
+            return "setup"
+        if self._is_stall(candidate["order"]):
+            return "stall"
+        return "anchor"
+
+    def _resolve_action(self, action, candidates, anchor):
+        """Map a cached abstract action back to a concrete candidate in THIS battle.
+        Returns None if that action isn't available now (caller falls back to LLM)."""
+        if action == "anchor":
+            return candidates[anchor]["order"] if anchor is not None else None
+        moves = [c for c in candidates if c["kind"] == "move"]
+        if action == "switch":
+            switches = [c for c in candidates if c["kind"] == "switch"]
+            return min(switches, key=lambda c: c["info"]["incoming_dmg_pct"])["order"] if switches else None
+        if action == "setup":
+            cs = [c for c in moves if self._is_setup(c["order"])]
+            return cs[0]["order"] if cs else None
+        if action == "stall":
+            cs = [c for c in moves if self._is_stall(c["order"])]
+            return cs[0]["order"] if cs else None
+        return None
 
     def _obvious_ko(self, candidates, battle):
         """A move we move first with that almost certainly KOs — no judgment needed."""

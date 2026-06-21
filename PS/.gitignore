@@ -23,6 +23,9 @@ battle_logs.json
 replays/
 battle_teams/
 
+# Learned LLM decision cache (session-accumulated; promote to tracked once seeded)
+bot/data/decision_cache.json
+
 # Node
 node_modules/
 
