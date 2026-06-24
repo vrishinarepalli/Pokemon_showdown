@@ -26,6 +26,9 @@ battle_teams/
 # Learned LLM decision cache (session-accumulated; promote to tracked once seeded)
 bot/data/decision_cache.json
 
+# Generated BC value-function dataset (rebuild from scraped replays)
+data/*.npz
+
 # Node
 node_modules/
 
